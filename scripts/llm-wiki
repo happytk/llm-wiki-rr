@@ -354,17 +354,38 @@ def check_structure(ctx: LintContext) -> None:
         ("wiki/topics", "Topics"),
         ("wiki/references", "References"),
         ("wiki/theses", "Theses"),
-        ("inventory", "Inventory"),
-        ("inventory/items", "Items"),
-        ("inventory/candidates", "Candidates"),
-        ("inventory/entities", "Entities"),
-        ("inventory/corpora", "Corpora"),
-        ("inventory/views", "Views"),
-        ("datasets", "Datasets"),
         ("output", "Output"),
     ]
     for rel, title in required:
         ensure_dir_index(ctx, ctx.root / rel, title)
+
+    if (ctx.root / "inventory").exists():
+        ensure_dir_index(ctx, ctx.root / "inventory", "Inventory")
+        for rel, title in [
+            ("inventory/items", "Items"),
+            ("inventory/candidates", "Candidates"),
+            ("inventory/entities", "Entities"),
+            ("inventory/corpora", "Corpora"),
+            ("inventory/views", "Views"),
+        ]:
+            path = ctx.root / rel
+            if path.exists():
+                ensure_dir_index(ctx, path, title)
+
+    if (ctx.root / "datasets").exists():
+        ensure_dir_index(ctx, ctx.root / "datasets", "Datasets")
+
+        for manifest in sorted((ctx.root / "datasets").glob("*/MANIFEST.md")):
+            dataset_dir = manifest.parent
+            ensure_dir_index(ctx, dataset_dir, dataset_dir.name)
+            for rel, title in [
+                ("samples", f"{dataset_dir.name} Samples"),
+                ("profiles", f"{dataset_dir.name} Profiles"),
+                ("queries", f"{dataset_dir.name} Queries"),
+            ]:
+                path = dataset_dir / rel
+                if path.exists():
+                    ensure_dir_index(ctx, path, title)
 
     inbox = ctx.root / "inbox"
     if not inbox.exists():
@@ -374,16 +395,6 @@ def check_structure(ctx: LintContext) -> None:
             ctx.fixed("Created inbox/ and inbox/.processed/.")
         else:
             ctx.issue("warning", "inbox/ is missing.", inbox, fixable=True)
-
-    for manifest in sorted((ctx.root / "datasets").glob("*/MANIFEST.md")):
-        dataset_dir = manifest.parent
-        for rel, title in [
-            ("", dataset_dir.name),
-            ("samples", f"{dataset_dir.name} Samples"),
-            ("profiles", f"{dataset_dir.name} Profiles"),
-            ("queries", f"{dataset_dir.name} Queries"),
-        ]:
-            ensure_dir_index(ctx, dataset_dir / rel, title)
 
 
 def is_hub(path: Path) -> bool:
@@ -985,12 +996,22 @@ def resolve_wiki_root(args: argparse.Namespace) -> Path:
 def run_lint(args: argparse.Namespace) -> int:
     root = resolve_wiki_root(args)
     ctx = LintContext(root, fix=args.fix)
+    hub_root = is_hub(root)
 
     check_structure(ctx)
+    check_unknown_files(ctx)
+    if hub_root:
+        append_lint_log(ctx)
+        if args.json:
+            print_json_report(ctx)
+        else:
+            print_text_report(ctx)
+        counts = ctx.counts()
+        return 1 if counts["critical"] or counts["warning"] or counts["suggestion"] else 0
+
     load_documents(ctx)
     check_frontmatter_schema(ctx)
     check_canonical_placement(ctx)
-    check_unknown_files(ctx)
     load_documents(ctx)
     check_index_consistency(ctx)
     check_links(ctx)

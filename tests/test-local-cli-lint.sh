@@ -84,6 +84,106 @@ else
   log_fail "--fix moves misplaced wiki files" "$fix_output"
 fi
 
+mkdir "$tmpdir/no-optional"
+cp -R "$GOLDEN/." "$tmpdir/no-optional/"
+rm -rf "$tmpdir/no-optional/inventory" "$tmpdir/no-optional/datasets"
+set +e
+optional_output="$("$CLI" lint --fix "$tmpdir/no-optional" 2>&1)"
+optional_rc=$?
+set -e
+if [ "$optional_rc" -eq 0 ] \
+  && grep -q "Result: PASS" <<<"$optional_output" \
+  && [ ! -e "$tmpdir/no-optional/inventory" ] \
+  && [ ! -e "$tmpdir/no-optional/datasets" ]; then
+  log_pass "--fix preserves absent optional inventory and dataset layers"
+else
+  log_fail "--fix preserves absent optional inventory and dataset layers" "$optional_output"
+fi
+
+mkdir "$tmpdir/sparse-optional"
+cp -R "$GOLDEN/." "$tmpdir/sparse-optional/"
+rm -rf "$tmpdir/sparse-optional/inventory" "$tmpdir/sparse-optional/datasets"
+mkdir -p "$tmpdir/sparse-optional/inventory" "$tmpdir/sparse-optional/datasets/sparse-dataset"
+cat > "$tmpdir/sparse-optional/inventory/_index.md" <<'EOF'
+# Inventory Index
+
+## Contents
+EOF
+cat > "$tmpdir/sparse-optional/datasets/_index.md" <<'EOF'
+# Dataset Registry Index
+
+## Contents
+
+| Dataset | Status | Storage | Formats | Size | Records | Updated |
+|---------|--------|---------|---------|------|---------|---------|
+| [Sparse Dataset](sparse-dataset/MANIFEST.md) | external | external | csv | unknown | unknown | 2026-01-03 |
+EOF
+cat > "$tmpdir/sparse-optional/datasets/sparse-dataset/_index.md" <<'EOF'
+# Sparse Dataset Index
+
+## Contents
+
+| File | Summary | Tags | Updated |
+|------|---------|------|---------|
+| [MANIFEST.md](MANIFEST.md) | Sparse optional-layer fixture. | sparse | 2026-01-03 |
+EOF
+cat > "$tmpdir/sparse-optional/datasets/sparse-dataset/MANIFEST.md" <<'EOF'
+---
+title: "Sparse Dataset"
+dataset_id: sparse-dataset
+status: external
+storage: external
+locations:
+  - https://example.com/sparse.csv
+formats: [csv]
+schema_status: unknown
+created: 2026-01-03
+updated: 2026-01-03
+tags: [sparse]
+summary: "Sparse optional-layer fixture."
+---
+
+# Sparse Dataset
+EOF
+set +e
+sparse_output="$("$CLI" lint --fix "$tmpdir/sparse-optional" 2>&1)"
+sparse_rc=$?
+set -e
+if [ "$sparse_rc" -eq 0 ] \
+  && grep -q "Result: PASS" <<<"$sparse_output" \
+  && [ ! -e "$tmpdir/sparse-optional/inventory/items" ] \
+  && [ ! -e "$tmpdir/sparse-optional/datasets/sparse-dataset/samples" ] \
+  && [ ! -e "$tmpdir/sparse-optional/datasets/sparse-dataset/profiles" ] \
+  && [ ! -e "$tmpdir/sparse-optional/datasets/sparse-dataset/queries" ]; then
+  log_pass "--fix preserves sparse optional layer subdirectories"
+else
+  log_fail "--fix preserves sparse optional layer subdirectories" "$sparse_output"
+fi
+
+hub_scope="$tmpdir/hub-scope"
+mkdir -p "$hub_scope/topics/noisy-topic"
+cp -R "$SCRIPT_DIR/fixtures/defects/missing-index/." "$hub_scope/topics/noisy-topic/"
+cat > "$hub_scope/_index.md" <<'EOF'
+# Hub Index
+EOF
+cat > "$hub_scope/log.md" <<'EOF'
+# Hub Log
+EOF
+cat > "$hub_scope/wikis.json" <<'JSON'
+{
+  "default": "<HUB>",
+  "wikis": {
+    "hub": { "path": "<HUB>", "description": "Hub" },
+    "noisy-topic": { "path": "topics/noisy-topic", "description": "Noisy topic" }
+  },
+  "local_wikis": []
+}
+JSON
+
+expect_success \
+  "hub lint stays scoped to hub registry" \
+  "$CLI" lint "$hub_scope"
+
 portable_home="$tmpdir/portable-home"
 portable_hub="$portable_home/Library/Mobile Documents/com~apple~CloudDocs/wiki"
 mkdir -p "$portable_home/.config/llm-wiki" "$portable_hub/topics/portable-topic"

@@ -203,7 +203,7 @@ Automatically run a quick structural check when any of these triggers occur:
 
 3. **Orphan detection**: Check if any `.md` files exist in wiki directories but are not listed in any `_index.md`. If found → add them to the index.
 
-4. **Missing directories**: Verify all expected subdirectories exist in the topic wiki (`raw/articles/`, `wiki/concepts/`, `inventory/items/`, `inventory/candidates/`, `datasets/`, etc.). If missing → create them with empty `_index.md`.
+4. **Missing directories**: Verify core topic wiki subdirectories exist (`raw/articles/`, `raw/papers/`, `wiki/concepts/`, `wiki/references/`, `output/`, etc.). If missing → create them with empty `_index.md`. Treat `inventory/` and `datasets/` as lazy optional layers: repair their indexes if they already exist, but do not create completely absent optional trees unless the current inventory or dataset workflow needs them.
 
 5. **wikis.json sync**: Check that all topic sub-wikis under `HUB/topics/` are registered in `wikis.json`. Store hub-owned topic paths as portable relative paths (`topics/<slug>`), not `/Users/<name>/...` absolute paths. If a directory exists but isn't registered → add it. If a registered path is stale but `HUB/topics/<name>` exists → repair the path. If registered but no matching directory exists → remove the entry.
 
