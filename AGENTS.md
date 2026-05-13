@@ -645,9 +645,9 @@ Flags: `--dry-run` (preview without writing), `--rules` (also propose CLAUDE.md/
 Auto-run lightweight checks after write operations:
 
 1. Hub should only have wikis.json, _index.md, log.md, topics/. Warn on anything else; never delete hub-level content automatically.
-2. Index freshness: file counts match index rows, including inventory and dataset indexes. Auto-fix mismatches.
+2. Index freshness: file counts match index rows, including inventory and dataset indexes. Ignore maintenance/report directories such as `.librarian/` and `.audit/`. Auto-fix mismatches by regenerating the affected directory index.
 3. Orphan detection: files not in any index → add them.
-4. Missing core topic directories → create with empty _index.md. Inventory and dataset layers are lazy: repair indexes when they already exist, but do not create absent optional trees unless the current inventory or dataset workflow needs them.
+4. Missing core topic directories → create with empty _index.md. Inventory and dataset layers are lazy: repair indexes when they already exist, but do not create absent optional trees unless the current inventory or dataset workflow needs them. For older compiled articles, infer safe schema fields from the directory/body and rewrite fuzzy raw-source refs only when they resolve unambiguously.
 5. wikis.json sync: all topic dirs registered with portable relative paths (`topics/<slug>`), stale absolute paths repaired when `HUB/topics/<slug>` exists, no ghost entries.
 
 Silent when clean. Auto-fix trivial issues. Warn on structural problems. Never block the user.

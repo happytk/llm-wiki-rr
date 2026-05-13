@@ -81,7 +81,7 @@ For each C9d cluster, output a ready-to-paste `/wiki:project new` + `/wiki:proje
 Compute composite freshness score (0-100) for each wiki article. Standard articles use four dimensions: source age, verification recency, compilation recency, source chain integrity. Articles with `compiled-from: conversation` use the two-dimension rebased formula from `references/linting.md` § C14. Decay curves scale by `volatility` tier. Flag articles below `freshness_threshold` from `config.md` (default 70).
 
 #### 14. C15: Missing Volatility (Info)
-Flag wiki articles lacking the `volatility` field. See `references/linting.md` § C15.
+Flag wiki articles lacking the `volatility` field. With `--fix`, add the safe default `volatility: warm`. See `references/linting.md` § C15.
 
 #### 15. C16: Inventory Structure and Migration Candidates (Suggestion)
 Check the inventory layer from `references/inventory.md` and `references/linting.md` § C16:
@@ -121,7 +121,7 @@ For each `.md` file in `wiki/` (excluding `_index.md`), verify that frontmatter 
 
 For each fixable issue, apply the auto-fix from the rules table in `references/linting.md`. Report what was fixed.
 
-IMPORTANT: Only auto-fix issues with clear, unambiguous fixes — missing index entries, broken stats, legacy `_project.md` → `WHY.md` migration (C8c), stale `output/_index.md` when `projects/` exists, legacy frontmatter keys/values (C13), files in the wrong canonical `raw/` or `wiki/` directory (C11), missing indexes inside existing inventory or dataset layers (C16/C17), etc. Do NOT auto-fix content quality issues. Do NOT create `WHY.md` with placeholder goals (C8a is warn-only — manufactured rationale is worse than the missing file). Do NOT create a completely absent optional inventory or dataset tree just to make placeholders. Do NOT move files into projects — C9 candidates are human-authored via `/wiki:project new` + `/wiki:project add`. Do NOT migrate output artifacts into inventory or dataset records — C16/C17 migration is explicit via `/wiki:inventory migrate-output --apply` or `/wiki:dataset migrate-output --apply`. Never auto-delete unknown directories (C12) — warn only. On slug collisions during a C11 placement move, skip and warn. Do NOT rewrite articles.
+IMPORTANT: Only auto-fix issues with clear, unambiguous fixes — missing index entries, dead index links, broken stats, legacy `_project.md` → `WHY.md` migration (C8c), stale `output/_index.md` when `projects/` exists, safe legacy frontmatter repairs (C13/C15), fuzzy raw-source refs that resolve to exactly one file, files in the wrong canonical `raw/` or `wiki/` directory (C11), missing indexes inside existing inventory or dataset layers (C16/C17), explicit uncompiled-source coverage references, etc. Do NOT auto-fix content quality issues. Do NOT create `WHY.md` with placeholder goals (C8a is warn-only — manufactured rationale is worse than the missing file). Do NOT create a completely absent optional inventory or dataset tree just to make placeholders. Do NOT move files into projects — C9 candidates are human-authored via `/wiki:project new` + `/wiki:project add`. Do NOT migrate output artifacts into inventory or dataset records — C16/C17 migration is explicit via `/wiki:inventory migrate-output --apply` or `/wiki:dataset migrate-output --apply`. Never auto-delete unknown directories (C12) — warn only. On slug collisions during a C11 placement move, skip and warn. Do NOT rewrite article bodies except for explicitly requested recompilation.
 
 ### Report
 

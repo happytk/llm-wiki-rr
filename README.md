@@ -19,6 +19,8 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, th
 
 ## Changelog
 
+**v0.8.6** — **Lint repair correctness.** `lint --fix` now repairs legacy article frontmatter, rewrites fuzzy raw source refs to exact paths when resolution is unambiguous, regenerates stale directory indexes, ignores maintenance backup indexes under `.librarian/`, and creates an explicit uncompiled-source coverage reference instead of leaving raw coverage gaps as endless suggestions.
+
 **v0.8.5** — **Safer lint defaults.** Hub-level lint now stays scoped to the shared registry instead of recursively auditing every topic by accident, and `lint --fix` preserves absent lazy `inventory/` and `datasets/` layers unless those layers already exist or the current workflow needs them.
 
 **v0.8.4** — **Portable iCloud hub resolution.** Shared wiki folders now survive moving between Macs with different `/Users/<name>/...` paths: agents prefer portable `hub_path`, treat legacy `resolved_path` values as fallback caches, resolve `wikis.json` paths relative to the current hub, and fall back to populated `topics/<slug>/` directories when registry entries are stale or unreadable.
@@ -28,8 +30,6 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, th
 **v0.7.0** — **PDF, message archive, and Wayback adapters.** PDF ingest now prefers real markdown extraction over metadata stubs, with `pdftotext` plus Python-library fallback guidance. Collection ingestion now covers CSV/TSV/JSON/JSONL message archives as per-message markdown sources and Internet Archive CDX inventories as readability-to-markdown Wayback snapshot imports.
 
 **v0.6.0** — **Collection ingestion for external wikis and spec repos.** Added first-class `/wiki:ingest-collection` for bounded upstream corpora such as Git document repositories, BIP-style proposal sets, MediaWiki XML dumps, and MediaWiki API sites. Collection imports now create a `raw/repos/` manifest plus immutable child sources with upstream revision metadata, while compilation stays synthesized instead of copying another wiki wholesale. The router now detects bulk import intent, and lint/schema docs recognize collection provenance fields and manifest coverage exemptions.
-
-**v0.5.0–v0.5.1** — **Truth-seeking umbrella audit & durable session provenance.** `/wiki:audit` combines the wiki-only librarian pass with output drift checks, provenance review, and fresh research when local evidence is not enough, while the follow-up provenance work makes multi-round research replayable: `research` keeps `.session-events.jsonl` and `.session-checkpoint.json`, `audit` records its own provenance milestones, and `query --resume` can fall back to the checkpoint trail when no active session is running. `/wiki:librarian` stays available as the focused tool for keeping the `wiki/` layer in check.
 
 ## Install
 

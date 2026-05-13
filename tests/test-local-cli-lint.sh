@@ -160,6 +160,98 @@ else
   log_fail "--fix preserves sparse optional layer subdirectories" "$sparse_output"
 fi
 
+librarian_noise="$tmpdir/librarian-noise"
+mkdir "$librarian_noise"
+cp -R "$GOLDEN/." "$librarian_noise/"
+mkdir -p "$librarian_noise/.librarian/backup/raw/articles"
+cat > "$librarian_noise/.librarian/backup/raw/articles/_index.md" <<'EOF'
+# Backup Articles
+
+[dead.md](dead.md)
+EOF
+
+expect_success \
+  "lint ignores maintenance backup indexes under .librarian" \
+  "$CLI" lint "$librarian_noise"
+
+legacy_repair="$tmpdir/legacy-repair"
+mkdir "$legacy_repair"
+cp -R "$GOLDEN/." "$legacy_repair/"
+cat > "$legacy_repair/raw/articles/2026-01-04-quantum-canary-satoshi-coins.md" <<'EOF'
+---
+title: "Quantum Canary Satoshi Coins"
+source: https://example.com/quantum-canary
+type: articles
+ingested: 2026-01-04
+tags: [quantum, bitcoin]
+summary: "Quantum Canary source fixture for fuzzy source repair."
+---
+
+# Quantum Canary Satoshi Coins
+EOF
+cat > "$legacy_repair/wiki/topics/legacy-topic.md" <<'EOF'
+---
+title: "Legacy Topic"
+tags: [legacy, quantum]
+confidence: high
+sources: [quantum-canary]
+created: 2026-01-04
+updated: 2026-01-04
+---
+
+# Legacy Topic
+
+This older compiled article has useful prose but lacks newer schema fields that lint can safely infer from its directory and first paragraph.
+EOF
+cat >> "$legacy_repair/wiki/topics/_index.md" <<'EOF'
+| [Dead Topic](dead-topic.md) | no longer present | low | 2025-01-01 |
+EOF
+set +e
+legacy_output="$("$CLI" lint --fix "$legacy_repair" 2>&1)"
+legacy_rc=$?
+set -e
+if [ "$legacy_rc" -eq 0 ] \
+  && grep -q "Result: PASS" <<<"$legacy_output" \
+  && grep -q "category: topic" "$legacy_repair/wiki/topics/legacy-topic.md" \
+  && grep -q "summary:" "$legacy_repair/wiki/topics/legacy-topic.md" \
+  && grep -q "volatility: warm" "$legacy_repair/wiki/topics/legacy-topic.md" \
+  && grep -q "raw/articles/2026-01-04-quantum-canary-satoshi-coins.md" "$legacy_repair/wiki/topics/legacy-topic.md" \
+  && grep -q "Legacy Topic" "$legacy_repair/wiki/topics/_index.md" \
+  && ! grep -q "dead-topic.md" "$legacy_repair/wiki/topics/_index.md"; then
+  log_pass "--fix repairs legacy frontmatter, source refs, and indexes"
+else
+  log_fail "--fix repairs legacy frontmatter, source refs, and indexes" "$legacy_output"
+fi
+
+coverage_repair="$tmpdir/coverage-repair"
+mkdir "$coverage_repair"
+cp -R "$GOLDEN/." "$coverage_repair/"
+cat > "$coverage_repair/raw/articles/2026-01-05-uncompiled-source.md" <<'EOF'
+---
+title: "Uncompiled Source"
+source: https://example.com/uncompiled
+type: articles
+ingested: 2026-01-05
+tags: [coverage]
+summary: "Uncompiled raw source fixture for coverage repair."
+---
+
+# Uncompiled Source
+EOF
+set +e
+coverage_output="$("$CLI" lint --fix "$coverage_repair" 2>&1)"
+coverage_rc=$?
+set -e
+if [ "$coverage_rc" -eq 0 ] \
+  && grep -q "Result: PASS" <<<"$coverage_output" \
+  && [ -f "$coverage_repair/wiki/references/uncompiled-source-coverage.md" ] \
+  && grep -q "raw/articles/2026-01-05-uncompiled-source.md" "$coverage_repair/wiki/references/uncompiled-source-coverage.md" \
+  && grep -q "Uncompiled Source Coverage" "$coverage_repair/wiki/references/_index.md"; then
+  log_pass "--fix creates explicit coverage reference for uncompiled raw sources"
+else
+  log_fail "--fix creates explicit coverage reference for uncompiled raw sources" "$coverage_output"
+fi
+
 hub_scope="$tmpdir/hub-scope"
 mkdir -p "$hub_scope/topics/noisy-topic"
 cp -R "$SCRIPT_DIR/fixtures/defects/missing-index/." "$hub_scope/topics/noisy-topic/"

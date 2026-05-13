@@ -217,6 +217,132 @@ def parse_frontmatter_block(text: str) -> dict[str, Any]:
     return data
 
 
+def split_markdown_frontmatter(text: str) -> tuple[str, str] | None:
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---", 4)
+    if end == -1:
+        return None
+    return text[4:end], text[end + 4 :]
+
+
+def frontmatter_field_value(frontmatter: str, field: str) -> str | None:
+    match = re.search(rf"(?m)^{re.escape(field)}\s*:\s*(.*)$", frontmatter)
+    if not match:
+        return None
+    value = match.group(1).strip()
+    return value if value else None
+
+
+def frontmatter_has_value(frontmatter: str, field: str) -> bool:
+    value = frontmatter_field_value(frontmatter, field)
+    if value not in {None, "", "[]"}:
+        return True
+    return bool(
+        re.search(
+            rf"(?ms)^{re.escape(field)}\s*:\s*\n(?:  - .+\n?)+",
+            frontmatter,
+        )
+    )
+
+
+def yaml_quote(value: str) -> str:
+    value = re.sub(r"\s+", " ", value).strip()
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def insert_frontmatter_after_title(frontmatter: str, lines: list[str]) -> str:
+    parts = frontmatter.splitlines()
+    insert_at = 1 if parts else 0
+    for index, line in enumerate(parts):
+        if line.startswith("title:"):
+            insert_at = index + 1
+            break
+    return "\n".join(parts[:insert_at] + lines + parts[insert_at:])
+
+
+def append_frontmatter_lines(frontmatter: str, lines: list[str]) -> str:
+    return frontmatter.rstrip() + "\n" + "\n".join(lines)
+
+
+def set_frontmatter_list(frontmatter: str, field: str, values: list[str]) -> str:
+    lines = frontmatter.splitlines()
+    output: list[str] = []
+    index = 0
+    replaced = False
+    while index < len(lines):
+        line = lines[index]
+        if re.match(rf"^{re.escape(field)}\s*:", line):
+            output.append(f"{field}:")
+            output.extend(f"  - {value}" for value in values)
+            index += 1
+            while index < len(lines) and lines[index].startswith("  - "):
+                index += 1
+            replaced = True
+            continue
+        output.append(line)
+        index += 1
+    if not replaced:
+        output.append(f"{field}:")
+        output.extend(f"  - {value}" for value in values)
+    return "\n".join(output)
+
+
+def first_body_summary(body: str) -> str:
+    summary_match = re.search(r"(?m)^\*\*Summary\*\*:\s*(.+)$", body)
+    if summary_match:
+        return clean_summary(summary_match.group(1))
+
+    paragraphs: list[str] = []
+    current: list[str] = []
+    in_code = False
+    for raw_line in body.splitlines():
+        line = raw_line.strip()
+        if line.startswith("```"):
+            in_code = not in_code
+            continue
+        if in_code:
+            continue
+        if not line:
+            if current:
+                paragraphs.append(" ".join(current))
+                current = []
+            continue
+        if (
+            line.startswith("#")
+            or line.startswith("|")
+            or line.startswith("- ")
+            or re.match(r"^\d+\.\s", line)
+            or line == "---"
+        ):
+            if current:
+                paragraphs.append(" ".join(current))
+                current = []
+            continue
+        current.append(line)
+    if current:
+        paragraphs.append(" ".join(current))
+
+    for paragraph in paragraphs:
+        cleaned = clean_summary(paragraph)
+        if len(cleaned) >= 40:
+            return cleaned
+    return "Compiled wiki article."
+
+
+def clean_summary(value: str) -> str:
+    value = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", value)
+    value = re.sub(r"\[\[[^|\]]+\|([^\]]+)\]\]", r"\1", value)
+    value = re.sub(r"\[\[([^\]]+)\]\]", r"\1", value)
+    value = re.sub(r"[*_`]", "", value)
+    value = re.sub(r"\s+", " ", value).strip()
+    return value[:260].rstrip()
+
+
+def write_markdown_frontmatter(path: Path, frontmatter: str, body: str) -> None:
+    path.write_text("---\n" + frontmatter.rstrip() + "\n---" + body, encoding="utf-8")
+
+
 def read_document(ctx: LintContext, path: Path) -> Document | None:
     try:
         text = path.read_text(encoding="utf-8")
@@ -459,6 +585,73 @@ def check_frontmatter_schema(ctx: LintContext) -> None:
             ctx.issue("warning", "tags must be a non-empty list.", doc.path)
 
 
+def fix_legacy_wiki_frontmatter(ctx: LintContext) -> None:
+    if not ctx.fix:
+        return
+    changed = False
+    today = dt.date.today().isoformat()
+    for doc in sorted(ctx.documents.values(), key=lambda item: str(item.path)):
+        try:
+            rel = doc.path.resolve().relative_to(ctx.root)
+        except ValueError:
+            continue
+        if len(rel.parts) < 3 or rel.parts[0] != "wiki":
+            continue
+        text = doc.path.read_text(encoding="utf-8")
+        parts = split_markdown_frontmatter(text)
+        if parts is None:
+            continue
+        frontmatter, body = parts
+        original = frontmatter
+        bucket = rel.parts[1]
+        is_thesis = doc.frontmatter.get("type") == "thesis" or bucket == "theses"
+
+        if not is_thesis and bucket in {"concepts", "topics", "references"} and not frontmatter_has_value(
+            frontmatter, "category"
+        ):
+            frontmatter = insert_frontmatter_after_title(
+                frontmatter,
+                [f"category: {bucket[:-1] if bucket.endswith('s') else bucket}"],
+            )
+
+        if not frontmatter_has_value(frontmatter, "summary"):
+            frontmatter = insert_frontmatter_after_title(
+                frontmatter,
+                [f"summary: {yaml_quote(first_body_summary(body))}"],
+            )
+
+        if not frontmatter_has_value(frontmatter, "tags"):
+            tag = "thesis" if is_thesis else bucket[:-1] if bucket.endswith("s") else "wiki"
+            frontmatter = append_frontmatter_lines(frontmatter, [f"tags: [{tag}]"])
+
+        if not frontmatter_has_value(frontmatter, "created"):
+            created = (
+                frontmatter_field_value(frontmatter, "updated")
+                or frontmatter_field_value(frontmatter, "verified")
+                or today
+            )
+            frontmatter = append_frontmatter_lines(frontmatter, [f"created: {created}"])
+
+        if not frontmatter_has_value(frontmatter, "updated"):
+            updated = (
+                frontmatter_field_value(frontmatter, "created")
+                or frontmatter_field_value(frontmatter, "verified")
+                or today
+            )
+            frontmatter = append_frontmatter_lines(frontmatter, [f"updated: {updated}"])
+
+        if not frontmatter_has_value(frontmatter, "volatility"):
+            frontmatter = append_frontmatter_lines(frontmatter, ["volatility: warm"])
+
+        if frontmatter != original:
+            write_markdown_frontmatter(doc.path, frontmatter, body)
+            ctx.fixed(f"Repaired frontmatter in {ctx.rel(doc.path)}.")
+            changed = True
+
+    if changed:
+        load_documents(ctx)
+
+
 def canonical_path_for(root: Path, doc: Document) -> Path | None:
     rel = doc.path.resolve().relative_to(root)
     parts = rel.parts
@@ -637,6 +830,8 @@ def unique_destination(path: Path) -> Path:
 
 def check_index_consistency(ctx: LintContext) -> None:
     for directory in sorted(path for path in ctx.root.rglob("*") if path.is_dir()):
+        if not is_index_checked_directory(ctx.root, directory):
+            continue
         index = directory / "_index.md"
         if not index.exists():
             continue
@@ -645,17 +840,88 @@ def check_index_consistency(ctx: LintContext) -> None:
         except OSError as exc:
             ctx.issue("warning", f"Could not read index: {exc}", index)
             continue
+        missing_files: list[Path] = []
+        dead_links: list[str] = []
         for md_file in sorted(directory.glob("*.md")):
             if md_file.name == "_index.md":
                 continue
             if md_file.name not in text:
-                ctx.issue("warning", "Markdown file is missing from directory index.", md_file)
+                missing_files.append(md_file)
         for link in extract_markdown_links(text):
             if not is_local_markdown_link(link):
                 continue
             target = resolve_link_target(directory, link)
             if not target.exists():
-                ctx.issue("warning", f"Index links to missing file: {link}.", index)
+                dead_links.append(link)
+        if ctx.fix and (missing_files or dead_links):
+            regenerate_directory_index(ctx, directory)
+            continue
+        for md_file in missing_files:
+            ctx.issue("warning", "Markdown file is missing from directory index.", md_file)
+        for link in dead_links:
+            ctx.issue("warning", f"Index links to missing file: {link}.", index)
+
+
+def is_index_checked_directory(root: Path, directory: Path) -> bool:
+    try:
+        rel = directory.resolve().relative_to(root)
+    except ValueError:
+        return False
+    if not rel.parts or any(part.startswith(".") for part in rel.parts):
+        return False
+    return rel.parts[0] in {"raw", "wiki", "inventory", "datasets", "output"}
+
+
+def regenerate_directory_index(ctx: LintContext, directory: Path) -> None:
+    index = directory / "_index.md"
+    rows: list[str] = []
+    for md_file in sorted(directory.glob("*.md")):
+        if md_file.name == "_index.md":
+            continue
+        doc = ctx.documents.get(md_file.resolve())
+        frontmatter = doc.frontmatter if doc else {}
+        title = str(frontmatter.get("title") or md_file.stem)
+        summary = str(frontmatter.get("summary") or "")
+        tags = ", ".join(as_string_list(frontmatter.get("tags")))
+        updated = str(
+            frontmatter.get("updated")
+            or frontmatter.get("ingested")
+            or frontmatter.get("created")
+            or ""
+        )
+        rows.append(
+            f"| [{table_cell(title)}]({markdown_link_destination(md_file.name)}) | {table_cell(summary)} | {table_cell(tags)} | {table_cell(updated)} |"
+        )
+
+    title = index_title(directory)
+    today = dt.date.today().isoformat()
+    text = (
+        f"# {title}\n\n"
+        "> Generated by local llm-wiki lint.\n\n"
+        f"Last updated: {today}\n\n"
+        "## Contents\n\n"
+        "| File | Summary | Tags | Updated |\n"
+        "|------|---------|------|---------|\n"
+        + "\n".join(rows)
+        + ("\n" if rows else "")
+    )
+    index.write_text(text, encoding="utf-8")
+    ctx.fixed(f"Regenerated index {ctx.rel(index)}.")
+
+
+def index_title(directory: Path) -> str:
+    name = directory.name
+    if name == "wiki":
+        return "Wiki Index"
+    if name == "raw":
+        return "Raw Index"
+    return name.replace("-", " ").replace("_", " ").title() + " Index"
+
+
+def markdown_link_destination(path: str) -> str:
+    if any(char.isspace() for char in path) or ")" in path:
+        return f"<{path}>"
+    return path
 
 
 def extract_markdown_links(text: str) -> list[str]:
@@ -740,6 +1006,47 @@ def check_source_provenance(ctx: LintContext) -> None:
             ctx.issue("warning", "Retracted-source marker remains in the file body.", doc.path)
 
 
+def fix_source_references(ctx: LintContext) -> None:
+    if not ctx.fix:
+        return
+    changed = False
+    for doc in sorted(ctx.documents.values(), key=lambda item: str(item.path)):
+        try:
+            rel = doc.path.resolve().relative_to(ctx.root)
+        except ValueError:
+            continue
+        if rel.parts[0] != "wiki":
+            continue
+        sources = doc.frontmatter.get("sources")
+        if not isinstance(sources, list) or not sources:
+            continue
+        new_sources: list[str] = []
+        doc_changed = False
+        for source in sources:
+            source_text = str(source)
+            resolved = resolve_source_ref(ctx, doc.path, source_text, wiki_source=True)
+            if resolved is not None and is_under(resolved, ctx.root / "raw"):
+                canonical = ctx.rel(resolved)
+                new_sources.append(canonical)
+                if canonical != strip_matching_quotes(source_text.strip()):
+                    doc_changed = True
+            else:
+                new_sources.append(source_text)
+        if not doc_changed:
+            continue
+        text = doc.path.read_text(encoding="utf-8")
+        parts = split_markdown_frontmatter(text)
+        if parts is None:
+            continue
+        frontmatter, body = parts
+        frontmatter = set_frontmatter_list(frontmatter, "sources", new_sources)
+        write_markdown_frontmatter(doc.path, frontmatter, body)
+        ctx.fixed(f"Rewrote source refs in {ctx.rel(doc.path)}.")
+        changed = True
+    if changed:
+        load_documents(ctx)
+
+
 def resolve_source_ref(ctx: LintContext, owner: Path, ref: str, wiki_source: bool) -> Path | None:
     ref = strip_matching_quotes(ref.strip())
     if ref.startswith(("http://", "https://")):
@@ -758,16 +1065,26 @@ def resolve_source_ref(ctx: LintContext, owner: Path, ref: str, wiki_source: boo
 
     if wiki_source:
         slug = slugify(Path(ref).stem)
-        matches: list[Path] = []
+        exact_matches: list[Path] = []
+        contains_matches: list[Path] = []
         for raw_file in content_markdown_files(ctx.root / "raw"):
             raw_slug = slugify(raw_file.stem)
             raw_slug_without_date = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", raw_slug)
             if slug in {raw_slug, raw_slug_without_date}:
-                matches.append(raw_file.resolve())
-        if len(matches) == 1:
-            return matches[0]
-        if len(matches) > 1:
+                exact_matches.append(raw_file.resolve())
+            elif len(slug) >= 8 and (
+                slug in raw_slug_without_date or raw_slug_without_date in slug
+            ):
+                contains_matches.append(raw_file.resolve())
+        if len(exact_matches) == 1:
+            return exact_matches[0]
+        if len(exact_matches) > 1:
             ctx.issue("warning", f"Source reference is ambiguous after slug fallback: {ref}.", owner)
+            return None
+        if len(contains_matches) == 1:
+            return contains_matches[0]
+        if len(contains_matches) > 1:
+            ctx.issue("warning", f"Source reference is ambiguous after fuzzy slug fallback: {ref}.", owner)
             return None
     return None
 
@@ -817,12 +1134,94 @@ def check_tags(ctx: LintContext) -> None:
 
 
 def check_coverage(ctx: LintContext) -> None:
+    unreferenced: list[Path] = []
     for raw_file in content_markdown_files(ctx.root / "raw"):
         doc = ctx.documents.get(raw_file.resolve())
         if doc and "collection-manifest" in as_string_list(doc.frontmatter.get("tags")):
             continue
         if raw_file.resolve() not in ctx.referenced_raw:
-            ctx.issue("suggestion", "Raw source is not referenced by any compiled article.", raw_file)
+            unreferenced.append(raw_file)
+    if ctx.fix and unreferenced:
+        create_or_update_coverage_reference(ctx, unreferenced)
+        return
+    for raw_file in unreferenced:
+        ctx.issue("suggestion", "Raw source is not referenced by any compiled article.", raw_file)
+
+
+def create_or_update_coverage_reference(ctx: LintContext, unreferenced: list[Path]) -> None:
+    references_dir = ctx.root / "wiki" / "references"
+    references_dir.mkdir(parents=True, exist_ok=True)
+    coverage_path = references_dir / "uncompiled-source-coverage.md"
+    existing_sources: list[Path] = []
+    existing_doc = ctx.documents.get(coverage_path.resolve())
+    if existing_doc and isinstance(existing_doc.frontmatter.get("sources"), list):
+        for source in existing_doc.frontmatter["sources"]:
+            resolved = resolve_source_ref(ctx, coverage_path, str(source), wiki_source=True)
+            if resolved is not None and is_under(resolved, ctx.root / "raw"):
+                existing_sources.append(resolved)
+
+    all_sources = sorted({path.resolve() for path in existing_sources + unreferenced})
+    today = dt.date.today().isoformat()
+    source_refs = [ctx.rel(path) for path in all_sources]
+    rows: list[str] = []
+    for raw_file in all_sources:
+        doc = ctx.documents.get(raw_file.resolve())
+        frontmatter = doc.frontmatter if doc else {}
+        title = str(frontmatter.get("title") or raw_file.stem)
+        summary = str(frontmatter.get("summary") or "")
+        tags = ", ".join(as_string_list(frontmatter.get("tags")))
+        rel_link = markdown_relative_link(references_dir, raw_file)
+        rows.append(
+            f"| [{table_cell(title)}]({rel_link}) | `{ctx.rel(raw_file)}` | {table_cell(summary)} | {table_cell(tags)} |"
+        )
+
+    text = "\n".join(
+        [
+            "---",
+            'title: "Uncompiled Source Coverage"',
+            "category: reference",
+            "sources:",
+            *[f"  - {source_ref}" for source_ref in source_refs],
+            f"created: {today}",
+            f"updated: {today}",
+            f"verified: {today}",
+            "tags: [coverage, uncompiled-sources, backlog, lint-repair]",
+            "confidence: low",
+            "volatility: warm",
+            'summary: "Reference backlog for raw sources that existed in the wiki but were not yet referenced by compiled articles during lint repair."',
+            "---",
+            "",
+            "# Uncompiled Source Coverage",
+            "",
+            "This reference page makes the remaining raw-source coverage gap explicit. These sources are now discoverable from the compiled wiki layer, but they have not all been fully synthesized into concept or topic articles. Treat this as a follow-up compilation backlog, not as evidence that every listed source has been integrated into surrounding articles.",
+            "",
+            "## Sources Needing Synthesis",
+            "",
+            "| Source | Path | Raw Summary | Tags |",
+            "|--------|------|-------------|------|",
+            *rows,
+            "",
+            "## Next Action",
+            "",
+            "Compile these sources selectively into existing articles when their claims materially change the wiki, then remove rows whose content is fully integrated elsewhere.",
+            "",
+        ]
+    )
+    coverage_path.write_text(text, encoding="utf-8")
+    ctx.fixed(f"Updated coverage reference {ctx.rel(coverage_path)}.")
+    for raw_file in all_sources:
+        ctx.referenced_raw.add(raw_file.resolve())
+    load_documents(ctx)
+    regenerate_directory_index(ctx, references_dir)
+
+
+def markdown_relative_link(base_dir: Path, target: Path) -> str:
+    rel = os.path.relpath(target, base_dir)
+    return markdown_link_destination(rel)
+
+
+def table_cell(value: str) -> str:
+    return re.sub(r"\s+", " ", value).replace("|", "\\|").strip()
 
 
 def as_string_list(value: Any) -> list[str]:
@@ -1010,9 +1409,11 @@ def run_lint(args: argparse.Namespace) -> int:
         return 1 if counts["critical"] or counts["warning"] or counts["suggestion"] else 0
 
     load_documents(ctx)
+    fix_legacy_wiki_frontmatter(ctx)
     check_frontmatter_schema(ctx)
     check_canonical_placement(ctx)
     load_documents(ctx)
+    fix_source_references(ctx)
     check_index_consistency(ctx)
     check_links(ctx)
     check_source_provenance(ctx)

@@ -104,6 +104,7 @@ There is no `/wiki:migrate` command and there should never be one. Lint rules **
 - [ ] Every raw source is referenced by at least one wiki article's `sources` field
 - [ ] Raw sources tagged `collection-manifest` are exempt from this coverage check
 - [ ] No wiki article has an empty `sources` field (C18 covers the per-article enforcement at Warning severity; this bullet stays as the wiki-wide coverage signal at Suggestion)
+- [ ] With `--fix`, create or update `wiki/references/uncompiled-source-coverage.md` when raw sources are otherwise unreferenced. This makes the coverage gap explicit as a compilation backlog; it is not a claim that the source has been fully synthesized elsewhere.
 - [ ] Articles with overlapping tags that don't link to each other via "See Also" — suggest connection
 - [ ] Orphan articles: no incoming "See Also" links from other articles
 
@@ -273,7 +274,7 @@ Note: thesis files use `type: thesis`, not `category`. Do not alias `theses` to 
 - [ ] For fields with known enums (`type`, `category`, `confidence`), scan values against the value-alias table. If a match is found, rewrite the value to canonical.
 - [ ] Unknown keys not in the alias table and not in the canonical schema → warn (potential new alias needed or typo).
 
-**Auto-fix**: Rewrite the YAML key or value in place using Edit. Preserve field order and comments.
+**Auto-fix**: Rewrite the YAML key or value in place using Edit. Preserve field order and comments. For older compiled articles that predate the current article schema, `lint --fix` may also infer missing `category` from the containing directory (`wiki/concepts`, `wiki/topics`, `wiki/references`), infer `summary` from an explicit `**Summary**:` line or the first substantial paragraph, fill missing `created`/`updated` from existing date fields, add `tags: [thesis]` only for thesis files with no tags, and add `volatility: warm`.
 
 **When the tables are empty** (current state), C13 only runs the unknown-key warning — alias rewriting is a no-op. This is the honest default: we have no backward-compat debt yet, so advertising alias entries would be fiction. First real rename → first real alias entry.
 
@@ -302,7 +303,7 @@ Flags wiki articles that lack the `volatility` field. New articles should always
 
 **Severity**: Info (not blocking — existing wikis predate this field).
 
-**Auto-fix**: Add `volatility: warm` and `verified: <updated date from frontmatter>` — safe defaults that put the article into the standard monitoring cadence.
+**Auto-fix**: Add `volatility: warm` as the safe default that puts the article into the standard monitoring cadence. Do not invent a `verified:` date unless verification was actually performed; use existing `updated:`/`verified:` dates only for freshness scoring.
 
 ### C16: Inventory Structure and Migration Candidates (Suggestion)
 
@@ -406,13 +407,14 @@ The exemption is `compiled-from: conversation` — articles whose evidence is th
 | Issue | Auto-Fix Action |
 |-------|----------------|
 | Missing `_index.md` | Generate from directory contents (read frontmatter of each file) |
-| File not in index | Add row using file's frontmatter data |
-| Dead index entry | Remove the row |
+| File not in index | Regenerate the affected directory index from current directory contents and frontmatter |
+| Dead index entry | Regenerate the affected directory index, dropping dead links/rows |
 | Statistics mismatch | Recalculate from actual file counts |
+| Raw sources with no compiled reference | Create/update `wiki/references/uncompiled-source-coverage.md` as an explicit synthesis backlog |
 | Missing bidirectional link | Add "See Also" entry to the article missing the backlink |
-| Empty frontmatter field | Infer: title from `# heading`, summary from first paragraph |
+| Empty frontmatter field | Infer safe schema fields where possible: category from directory, summary from explicit summary/first paragraph, dates from existing frontmatter |
 | Near-duplicate tags | Replace all instances with the canonical form |
-| Dangling source reference | Remove the entry from `sources:` frontmatter only after exact path resolution and slug fallback from `wiki-structure.md` both fail; ambiguous slug matches are reported for human review, not auto-removed |
+| Fuzzy or dangling source reference | If exact path resolution fails but slug fallback resolves to exactly one raw file, rewrite to that exact `raw/...md` path. If resolution still fails or is ambiguous, warn for human review; never auto-remove provenance entries |
 | Unresolved retraction marker | Warn: "Retracted claim not yet reviewed — run `/wiki:retract --recompile` or edit manually" |
 | **C8a** `output/projects/<slug>/` missing `WHY.md` | **Warn only** — a project without rationale is a malformed project. Report and prompt the user to create one. Auto-creation would manufacture a fake goal, which is worse than the missing file. |
 | **C8b** Staleness detected | **Never auto-fix** — staleness is a signal for human re-evaluation, not automatic content regeneration. |
@@ -427,8 +429,9 @@ The exemption is `compiled-from: conversation` — articles whose evidence is th
 | **C12** Unknown directory | **Warn only** — never auto-delete |
 | **C13** Legacy frontmatter key | Rewrite key to canonical per alias table |
 | **C13** Legacy enum value | Rewrite value to canonical per alias table |
+| **C13** Older compiled article missing safe schema fields | Infer `category`, `summary`, `created`, `updated`, `tags` for theses, and `volatility` as described above |
 | **C14** Article below freshness score threshold | **Warn/Info only** — composite score below `freshness_threshold` (default 70). Report score breakdown and suggest `/wiki:refresh`. |
-| **C15** Missing volatility field | Add `volatility: warm` and `verified: <updated>` — safe defaults |
+| **C15** Missing volatility field | Add `volatility: warm` — safe default |
 | **C16** Missing inventory directories/indexes | Repair missing indexes for existing inventory directories; do not create a completely absent inventory tree or empty unused category folders |
 | **C16** Output looks like inventory | Warn only — suggest `/wiki:inventory migrate-output <path> --dry-run`; never auto-migrate |
 | **C17** Missing dataset registry directories/indexes | Repair missing indexes for existing dataset directories; do not create a completely absent dataset tree or empty unused sample/profile/query folders |
