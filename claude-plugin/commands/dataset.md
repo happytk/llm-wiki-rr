@@ -1,6 +1,6 @@
 ---
 description: "Manage dataset manifests for data that is too large or unsuitable to store directly in the wiki. The wiki becomes the index/interface; the data stays external."
-argument-hint: "list [--status <status>] [--storage <mode>] [--view summary|manifests|schema|locations] [--limit N] [--format table|list] | add \"<title>\" [--location <path-or-url>] [--format <fmt>] | show <slug-or-path> | scan-outputs [--dry-run] | migrate-output <output-path> [--dry-run|--apply] | profile <slug> [--dry-run|--apply] | sample <slug> [--limit N] [--dry-run|--apply] [--wiki <name>] [--local]"
+argument-hint: "list [--status <status>] [--storage <mode>] [--view summary|manifests|schema|locations] [--limit N] [--format table|list] | add \"<title>\" [--location <path-or-url>] [--format <fmt>] | show <slug-or-path> | scan-outputs [--dry-run] | migrate-output <output-path> [--dry-run|--apply] | profile <slug> [--dry-run|--apply] | sample <slug> [--limit N] [--dry-run|--apply] [--include-archived] [--wiki <name>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), Bash(du:*), Bash(stat:*), Bash(head:*), Bash(file:*)
 ---
 
@@ -11,6 +11,12 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found. Run `/wiki init` first."
+
+Archive rule: dataset commands operate on active topic wikis by default. If a
+named target is archived, stop and ask the user to restore it or rerun with
+`--include-archived`. When explicitly included, list/update manifests only
+inside that archived topic path and label the result as archived. This is
+separate from dataset manifest `status: archived`.
 
 After resolving the wiki, read the dataset reference at `skills/wiki-manager/references/datasets.md`, then run the requested subcommand.
 
@@ -55,6 +61,9 @@ Storage modes:
 
 Schema statuses:
 `unknown`, `inferred`, `declared`, `validated`.
+
+Archive flag:
+`--include-archived` explicitly allows the selected wiki itself to be archived.
 
 ### Ensure Structure
 

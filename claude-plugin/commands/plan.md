@@ -1,6 +1,6 @@
 ---
-description: "Generate an implementation plan grounded in wiki research. Reads the knowledge base, interviews you about requirements, fills gaps with targeted research, and produces a phased plan with architecture decisions citing wiki articles as evidence."
-argument-hint: "<what to build> [--wiki <name>] [--with <wiki>...] [--local] [--quick] [--no-interview] [--no-research] [--format rfc|adr|roadmap|spec]"
+description: "Generate an implementation plan grounded in active wiki research. Reads the knowledge base, interviews you about requirements, fills gaps with targeted research, and produces a phased plan with architecture decisions citing wiki articles as evidence."
+argument-hint: "<what to build> [--wiki <name>] [--with <wiki>...] [--include-archived] [--local] [--quick] [--no-interview] [--no-research] [--format rfc|adr|roadmap|spec]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), WebFetch, WebSearch, Agent
 ---
 
@@ -27,6 +27,8 @@ items and next actions.
 - **--wiki <name>**: Target a specific topic wiki as the primary knowledge source (subject matter)
 - **--with <wiki>**: Load a supplementary wiki as additional context. The primary wiki provides **domain knowledge** (what to build); `--with` wikis provide **craft/skill** knowledge (how to build it, writing techniques, design patterns). Multiple `--with` flags allowed.
 - **--local**: Use project-local `.wiki/`
+- **--include-archived**: Explicitly allow archived primary or supplementary
+  wiki context. Label archived-derived constraints/sources in the plan.
 - **--quick**: Skip interview and gap research — produce a plan directly from wiki content (Stage 1 → Stage 5)
 - **--no-interview**: Skip the interview stage (Stage 2)
 - **--no-research**: Skip gap research (Stage 3) — plan only from existing wiki content
@@ -48,6 +50,11 @@ Read the wiki deeply to understand what knowledge exists about the planning goal
 4. **Read all relevant articles in full** — follow See Also links, read cited raw sources
 5. **Read sibling wiki `_index.md` files** — check if related knowledge exists elsewhere
 6. **Load `--with` wikis** (if specified): For each supplementary wiki, look up in `HUB/wikis.json`, read its `_index.md` and relevant articles. These provide craft/skill context — techniques, patterns, best practices to apply when generating the plan.
+
+Archived primary or supplementary wikis are rejected unless
+`--include-archived` is present. Deep context assembly may mention archived
+index matches as a separate note, but archived material should not shape the
+plan unless explicitly included.
 
 Produce a **context summary**: what the wiki knows about this topic, organized by:
 - **Directly relevant**: articles that address the goal head-on

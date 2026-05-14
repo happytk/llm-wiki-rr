@@ -67,6 +67,11 @@ Reason: a `status: archived` frontmatter field in the old model required the man
 
 There is no separate `retract` lifecycle state. Retraction means deleting the folder. That's a manual operation (`rm -rf`), deliberately not wrapped in a subcommand, because it's destructive and rare.
 
+This is separate from topic-wiki archive. Topic archive moves
+`HUB/topics/<slug>/` to `HUB/topics/.archive/<slug>/` and updates `wikis.json`
+so an entire wiki goes quiet. Project archive only moves one project folder
+inside an already selected topic wiki.
+
 ## Staleness detection
 
 A project is **stale** when new information relevant to it has been ingested since its artifacts were last updated. This is detected by lint check C8b, not by a manifest field, and the chain runs through frontmatter that already exists:

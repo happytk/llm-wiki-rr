@@ -14,6 +14,8 @@ HUB/                               # resolved from ~/.config/llm-wiki/config.jso
 └── topics/                        # Each topic is a full wiki
     ├── dementia/
     ├── quantum-computing/
+    ├── .archive/                  # Archived topic wikis, hidden by default
+    │   └── old-topic/
     └── ...
 ```
 
@@ -137,7 +139,14 @@ When a command runs, first resolve the hub path (HUB) from `~/.config/llm-wiki/c
   "default": "<HUB>",
   "wikis": {
     "hub": { "path": "<HUB>", "description": "Global knowledge base" },
-    "<topic>": { "path": "topics/<topic>", "description": "..." }
+    "<topic>": { "path": "topics/<topic>", "description": "...", "status": "active" },
+    "<archived-topic>": {
+      "path": "topics/.archive/<archived-topic>",
+      "description": "...",
+      "status": "archived",
+      "archived": "YYYY-MM-DD",
+      "archive_reason": "optional"
+    }
   },
   "local_wikis": [
     { "path": "/absolute/path/.wiki", "description": "..." }
@@ -149,6 +158,12 @@ Topic paths inside the shared hub should be relative (`topics/<topic>`) or use
 the `<HUB>` token. Avoid storing `/Users/<name>/...` absolute paths for
 hub-owned topic wikis; those break when an iCloud wiki is opened from another
 Mac with a different home directory.
+
+Archived topic wikis live under `topics/.archive/<slug>` and should keep their
+registry entries with `status: archived`. Normal wiki resolution, status,
+query, compile, research, output, librarian, refresh, and audit workflows skip
+archived entries unless the user explicitly includes archived content. See
+[archive.md](archive.md) for lifecycle semantics and restore rules.
 
 ## _index.md Format
 
@@ -190,6 +205,7 @@ Additionally includes:
 - Inventory records: N tracked items
 - Datasets: N manifests
 - Outputs: N generated artifacts
+- Archived topics: N (hub index only)
 - Last compiled: YYYY-MM-DD
 - Last lint: YYYY-MM-DD
 
@@ -224,7 +240,7 @@ Append-only chronological activity log. Every wiki operation appends an entry. N
 
 Each entry: `## [YYYY-MM-DD] operation | Description`
 
-Operations: `init`, `ingest`, `ingest-collection`, `compile`, `query`, `lint`, `research`, `output`, `refresh`, `librarian`, `audit`, `plan`, `project`, `inventory`, `dataset`, `ll`, `assess`
+Operations: `init`, `ingest`, `ingest-collection`, `compile`, `query`, `lint`, `research`, `output`, `refresh`, `librarian`, `audit`, `plan`, `project`, `inventory`, `dataset`, `archive`, `ll`, `assess`
 
 Useful for: `grep "^## \[" log.md | tail -10` to see recent activity.
 

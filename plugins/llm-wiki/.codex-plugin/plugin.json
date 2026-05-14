@@ -1,7 +1,7 @@
 {
   "name": "wiki",
-  "version": "0.8.7",
-  "description": "LLM-compiled knowledge bases for Codex. Build topic-scoped wikis, track inventory, index datasets, ingest sources and external collections, compile articles, run truth-seeking audits, query, lint, research, and generate outputs.",
+  "version": "0.9.0",
+  "description": "LLM-compiled knowledge bases for Codex. Build topic-scoped wikis, archive old topics, track inventory, index datasets, ingest sources and external collections, compile articles, run truth-seeking audits, query, lint, research, and generate outputs.",
   "author": {
     "name": "nvk",
     "url": "https://github.com/nvk"
@@ -19,13 +19,14 @@
     "audit",
     "librarian",
     "inventory",
-    "datasets"
+    "datasets",
+    "archive"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "LLM Wiki",
-    "shortDescription": "Build, inventory, index data, audit, and maintain research wikis",
-    "longDescription": "Bundle the llm-wiki workflow for Codex: initialize a wiki, track inventory, index large datasets without copying them into the wiki, ingest sources and external collections, compile articles, audit outputs and provenance, query knowledge, lint structure, run research, and generate outputs.",
+    "shortDescription": "Build, archive, inventory, index data, audit, and maintain research wikis",
+    "longDescription": "Bundle the llm-wiki workflow for Codex: initialize a wiki, archive old topics so they stay preserved but quiet, track inventory, index large datasets without copying them into the wiki, ingest sources and external collections, compile articles, audit outputs and provenance, query knowledge, lint structure, run research, and generate outputs.",
     "developerName": "nvk",
     "category": "Productivity",
     "capabilities": [
@@ -35,6 +36,7 @@
     "websiteURL": "https://github.com/nvk/llm-wiki",
     "defaultPrompt": [
       "Research a new topic and compile it into a wiki.",
+      "Archive an old topic wiki so it stays preserved but out of default context.",
       "Track this source queue as inventory, then ingest selected candidates into my wiki.",
       "Index this large dataset with a manifest, schema notes, samples, and query recipes.",
       "Ingest these notes or an external source collection into my wiki and update the indexes.",

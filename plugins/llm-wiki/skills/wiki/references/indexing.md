@@ -95,11 +95,20 @@ The root `_index.md` statistics are derived from actual file counts, not manual 
 - Inventory records: count .md files in `inventory/` subdirectories (excluding `_index.md`), or 0 if `inventory/` is absent
 - Dataset manifests: count `datasets/*/MANIFEST.md`, or 0 if `datasets/` is absent
 - Outputs: count .md files in `output/` (excluding `_index.md`)
+- Hub archived topics: count `HUB/topics/.archive/*/_index.md` or registry
+  entries with `status: archived`. Archived topics are reported separately and
+  excluded from active topic counts/tables by default.
 
 ## Cross-Wiki Index Peek
 
 When peeking at sibling wikis for overlap:
 1. Read `HUB/wikis.json` to get the list of all wikis
-2. For each sibling wiki, read ONLY its `_index.md` (not full articles)
-3. Check if any summaries or tags match the current query
-4. If overlap found, note it in the response — never read full articles from sibling wikis unless explicitly asked
+2. Skip entries with `status: archived` or paths under `topics/.archive/` unless
+   the query is deep enough to report archived matches or the user passed
+   `--include-archived`
+3. For each active sibling wiki, read ONLY its `_index.md` (not full articles)
+4. Check if any summaries or tags match the current query
+5. If overlap found, note it in the response — never read full articles from sibling wikis unless explicitly asked
+6. For deep queries, archived sibling `_index.md` matches may be reported in a
+   separate Archived Matches section. Do not cite archived content as active
+   evidence unless the user explicitly includes archived content.

@@ -1,6 +1,6 @@
 ---
-description: "Retract a source from the wiki. Removes the raw source, identifies all compiled articles that reference it, cleans up references, and flags claims for review. Optionally recompiles affected articles from remaining sources."
-argument-hint: "<source-path> [--reason \"why\"] [--recompile] [--dry-run] [--wiki <name>] [--local]"
+description: "Retract a source from the wiki, including explicitly targeted archived sources. Removes the raw source, identifies compiled articles that reference it, cleans up references, and flags claims for review."
+argument-hint: "<source-path> [--reason \"why\"] [--recompile] [--dry-run] [--include-archived] [--wiki <name>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(rm:*), Bash(grep:*)
 ---
 
@@ -14,6 +14,8 @@ Retract (remove) a source that was previously ingested into the wiki. This handl
 - **--reason "why"**: Reason for retraction (logged permanently). Required.
 - **--recompile**: After cleanup, recompile affected articles from their remaining sources. Without this flag, articles are cleaned but not resynthesized.
 - **--dry-run**: Show what would happen without making changes.
+- **--include-archived**: Explicitly allow retraction inside an archived target
+  wiki. Bad preserved evidence should still be retractable.
 - **--wiki <name>**: Target wiki (same resolution as other commands)
 - **--local**: Use project-local `.wiki/`
 
@@ -24,6 +26,9 @@ Retract (remove) a source that was previously ingested into the wiki. This handl
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found."
+
+If the resolved wiki is archived, require `--include-archived` before
+mutation. Keep the topic archived after the retraction.
 
 ### Phase 1: Identify the Source
 

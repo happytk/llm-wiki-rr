@@ -2,14 +2,15 @@
 name: wiki-manager
 description: >
   LLM-compiled knowledge base manager for OpenCode. Use it to initialize, ingest,
-  import source collections, track inventory, index datasets, compile, query, lint, audit, research, plan, and generate outputs from topic-scoped wikis.
+  import source collections, track inventory, index datasets, archive old topics, compile, query, lint, audit, research, plan, and generate outputs from topic-scoped wikis.
   Activates when the user mentions wiki workflows, knowledge-base management,
   ingestion, collection ingestion, import wiki, inventory, source queue,
   candidate list, watch list, backlog, dataset, large data, data registry,
   dataset manifest, compilation, querying, linting, audit, research, librarian,
   scan quality, article quality, content review, output drift, provenance,
-  lessons learned, implementation plan, or uses wiki-related shorthand in a repo
-  with .wiki/, ~/wiki/, or a configured hub path.
+  archive wiki, archive topic, restore wiki, lessons learned, implementation
+  plan, or uses wiki-related shorthand in a repo with .wiki/, ~/wiki/, or a
+  configured hub path.
 ---
 
 # LLM Wiki Manager
@@ -73,6 +74,12 @@ See [references/wiki-structure.md](references/wiki-structure.md) for the complet
 
 9. **Chunk large writes.** Never create files longer than ~200 lines in a single Write call — the API stream idles during large generations, causing timeout errors. Write the skeleton (frontmatter + headers + first section) first, then use sequential Edit calls to append remaining sections. For plans, articles, and raw notes: write one section per tool call.
 
+10. **Archive is quiet preservation.** Archived topic wikis live under
+`HUB/topics/.archive/<slug>/` and are hidden from normal semantic workflows.
+They remain structurally maintainable through explicit archive/lint operations.
+Deep queries may surface archived index matches separately, but archived content
+must not influence new synthesis unless the user explicitly includes it.
+
 ## Ambient Behavior
 
 When this skill activates outside of an explicit wiki-related request:
@@ -81,7 +88,7 @@ When this skill activates outside of an explicit wiki-related request:
 2. Read the master `_index.md` to assess if the wiki might cover the user's question
 3. If relevant content exists → read the relevant articles and answer with citations
 4. If no relevant content → answer normally, optionally suggest: "This could be added to your wiki — just ask me to ingest it."
-5. When peeking at sibling wikis, only read their `_index.md` — do not read full articles unless the user asks
+5. When peeking at sibling wikis, only read their `_index.md` — do not read full articles unless the user asks. Skip archived sibling wikis by default; in deep mode, archived index matches may be reported separately.
 
 When giving any boot, resume, or "where you left off" briefing, start with the
 active wiki identity: `<wiki-name> booted from <wiki-root-path>`. Prefer the
@@ -111,16 +118,24 @@ Flow: Run an inventory fit check → track durable wiki-adjacent things (items, 
 See [references/datasets.md](references/datasets.md).
 Flow: Keep large or external datasets out of the wiki while indexing them through `datasets/<slug>/MANIFEST.md` → store locations, schema notes, small samples, profiles, and query recipes → answer list requests from `datasets/_index.md` plus manifest frontmatter only → optionally convert legacy dataset outputs through explicit dry-run-first migration. Dataset migration is additive and never copies the underlying data into the wiki.
 
+### Archive
+See [references/archive.md](references/archive.md).
+Flow: Move whole topic wikis from `HUB/topics/<slug>/` to
+`HUB/topics/.archive/<slug>/` → mark `wikis.json` with `status: archived` →
+hide them from normal query/compile/research/output/maintenance context →
+restore by moving the folder back and setting `status: active`. Do not archive
+individual raw sources or compiled articles in v1.
+
 ### Compilation
 See [references/compilation.md](references/compilation.md).
 Flow: Survey uncompiled sources → plan articles → classify (concept/topic/reference) → write/update articles with cross-references → update all indexes.
 
 ### Query
-Flow: Read `_index.md` → identify relevant articles by summary/tag → read articles → follow See Also links → Grep for additional matches → synthesize answer with citations → note gaps → peek sibling wikis. Supports `--resume` to reload context after a session break — reads session files, recent log entries, wiki stats, and last-updated articles to produce a "where you left off" briefing.
+Flow: Read `_index.md` → identify relevant articles by summary/tag → read articles → follow See Also links → Grep for additional matches → synthesize answer with citations → note gaps → peek active sibling wikis. Supports `--resume` to reload context after a session break — reads session files, recent log entries, wiki stats, and last-updated articles to produce a "where you left off" briefing. Deep queries may peek archived sibling indexes in a separate Archived Matches section; full archived reads require explicit user intent.
 
 ### Linting
 See [references/linting.md](references/linting.md).
-Flow: Check structure → indexes → links → content → coverage → report → optionally auto-fix.
+Flow: Check structure → indexes → links → content → coverage → report → optionally auto-fix. Default lint keeps active material healthy and reports archived topics as skipped. Use `--include-archived` or `--archived-only` for explicit archived structural maintenance.
 
 ### Audit
 See [references/audit.md](references/audit.md).
@@ -189,7 +204,7 @@ Track uncompiled sources by comparing `raw/_index.md` ingestion dates against th
 Automatically run a quick structural check when any of these triggers occur:
 
 ### Triggers
-- **After any write operation** (ingest, compile, research, output, inventory, dataset) — verify what was just written
+- **After any write operation** (ingest, compile, research, output, inventory, dataset, archive) — verify what was just written
 - **When the skill activates** and the wiki hasn't been linted in 7+ days (check "Last lint" in `_index.md`)
 - **When content is found in the wrong place** — articles in the global hub instead of a topic sub-wiki
 - **When a user mentions wiki problems** — "wiki is broken", "empty", "missing", "wrong"
@@ -197,7 +212,7 @@ Automatically run a quick structural check when any of these triggers occur:
 
 ### Quick Structure Check (lightweight, runs inline — not a full lint)
 
-1. **Hub integrity**: The hub (HUB) should ONLY contain `wikis.json`, `_index.md`, `log.md`, and `topics/`. If `raw/`, `wiki/`, `inventory/`, `datasets/`, `output/`, `inbox/`, or `config.md` exist at the hub level → **warn, do not delete**. These may hold user data from an older wiki layout. Suggest running the lint --fix workflow, which will move contents to the appropriate topic wiki or quarantine to `inbox/.unknown/` per C11/C12/C16/C17 in `references/linting.md`.
+1. **Hub integrity**: The hub (HUB) should ONLY contain `wikis.json`, `_index.md`, `log.md`, and `topics/`. If `raw/`, `wiki/`, `inventory/`, `datasets/`, `output/`, `inbox/`, or `config.md` exist at the hub level → **warn, do not delete**. These may hold user data from an older wiki layout. Suggest running the lint --fix workflow, which will move contents to the appropriate topic wiki, repair archive registry drift, or quarantine to `inbox/.unknown/` per C11/C12/C16/C17/C19 in `references/linting.md`.
 
 2. **Index freshness**: For the active topic wiki, compare actual file counts in `raw/`, `wiki/`, `inventory/`, and `datasets/` subdirectories against the rows in their `_index.md`. Ignore maintenance/report areas such as `.librarian/` and `.audit/`. If mismatched → auto-fix by regenerating the affected directory index from frontmatter and removing dead entries.
 
@@ -206,6 +221,10 @@ Automatically run a quick structural check when any of these triggers occur:
 4. **Missing directories and legacy metadata**: Verify core topic wiki subdirectories exist (`raw/articles/`, `raw/papers/`, `wiki/concepts/`, `wiki/references/`, `output/`, etc.). If missing → create them with empty `_index.md`. Treat `inventory/` and `datasets/` as lazy optional layers: repair their indexes if they already exist, but do not create completely absent optional trees unless the current inventory or dataset workflow needs them. For older compiled articles, `lint --fix` may infer `category`, `summary`, dates, and `volatility` from the file location and existing body/frontmatter, and may rewrite fuzzy raw-source refs to exact `raw/...md` paths when the match is unambiguous.
 
 5. **wikis.json sync**: Check that all topic sub-wikis under `HUB/topics/` are registered in `wikis.json`. Store hub-owned topic paths as portable relative paths (`topics/<slug>`), not `/Users/<name>/...` absolute paths. If a directory exists but isn't registered → add it. If a registered path is stale but `HUB/topics/<name>` exists → repair the path. If registered but no matching directory exists → remove the entry.
+
+   Archived topic sub-wikis under `HUB/topics/.archive/` should be registered
+   with `path: topics/.archive/<slug>` and `status: archived`. Do not include
+   them in active status/query/compile defaults.
 
 6. **Log existence**: Verify `log.md` exists in the active wiki and at the hub. If missing → create it.
 

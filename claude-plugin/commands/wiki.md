@@ -1,5 +1,5 @@
 ---
-description: "LLM wiki knowledge base — understands natural language. Say what you want (add a URL, import a collection, track inventory, index a dataset, ask a question, research a topic, audit an output, resume work) and it routes to the right subcommand. Also handles init, status, and config."
+description: "LLM wiki knowledge base — understands natural language. Say what you want (add a URL, import a collection, track inventory, index a dataset, archive an old topic, ask a question, research a topic, audit an output, resume work) and it routes to the right subcommand. Also handles init, status, and config."
 argument-hint: "[<natural language request>] [init <topic-name> [--local]] [config hub-path [<path>]] [--wiki <name>]"
 allowed-tools: Read, Write, Edit, Glob, Bash(ls:*), Bash(wc:*), Bash(mkdir:*), Bash(date:*), Bash(mv:*)
 ---
@@ -91,9 +91,15 @@ Initialize a new wiki. Parse arguments:
 
 6. Ask the user: "What is this wiki about?" Use their answer to create `config.md` with title, description, scope, and today's date.
 
-7. Register in `HUB/wikis.json` with a portable relative path (`topics/<slug>`) and update hub `_index.md` topic wiki table. For local wikis, add to the `local_wikis` array with its absolute local path.
+7. Before registering, check both `HUB/topics/<slug>/` and
+   `HUB/topics/.archive/<slug>/`, plus any `wikis.json` entry with that slug.
+   If an archived topic already exists, stop and ask whether to restore it with
+   `/wiki:archive restore <slug>` or choose a different slug. Do not silently
+   create a new active topic over an archived topic boundary.
 
-8. Report what was created and suggest:
+8. Register in `HUB/wikis.json` with a portable relative path (`topics/<slug>`) and update hub `_index.md` topic wiki table. For local wikis, add to the `local_wikis` array with its absolute local path.
+
+9. Report what was created and suggest:
    - `/wiki:research "topic" --sources 10` — auto-research to bootstrap
    - `/wiki:ingest <url|file|text>` — add source material
    - `/wiki:ingest-collection <repo|wiki-dump>` — bulk import a bounded upstream collection
@@ -134,6 +140,7 @@ The user typed something that isn't a known keyword. Detect their intent and rou
 | 16 | **Project (list)** | "list projects", "what projects", "show projects", "my projects" | `Skill: wiki:project` with `list` |
 | 17 | **Project (show)** | "show project X", "what's in project X", "open project X" | `Skill: wiki:project` with `show <slug>` |
 | 18 | **Project (archive)** | "archive project", "I'm done with project", "close project" | `Skill: wiki:project` with `archive <slug>` |
+| 19 | **Topic Archive** | "archive wiki", "archive topic", "restore wiki", "restore topic", "list archived wikis", "show archived topics" | `Skill: wiki:archive` |
 
 **Confidence routing:**
 
@@ -160,6 +167,11 @@ The user typed something that isn't a known keyword. Detect their intent and rou
 - Inventory and dataset signals outrank generic question or URL patterns. For
   example, "what should become inventory?" routes to inventory, and "track this
   URL as a candidate" routes to inventory rather than immediate ingest.
+- Project archive signals outrank topic archive when the word "project" is
+  present. Dataset/source archive signals ("Wayback archive", "message
+  archive", "dataset archive") route to ingest-collection, dataset, or
+  inventory rather than lifecycle archive. Topic archive requires "wiki" or
+  "topic", or an unambiguous restore/list archived-wikis request.
 - For inventory/dataset routing, be opinionated about fit and show a small
   sample shape before asking the user to approve a larger pivot.
 - Strip the signal words when passing args to the target command (e.g., "add https://example.com" → pass just the URL to ingest, not "add https://example.com").
@@ -174,8 +186,12 @@ Show wiki status. Before reading any `_index.md`, stale-check it: count `.md` fi
 
 1. If at the hub level (HUB):
    - Read `HUB/_index.md` and `HUB/wikis.json`
-   - For each registered topic wiki, read its `_index.md` to get current stats
+   - For each active registered topic wiki, read its `_index.md` to get current stats
+   - Count archived topics from registry entries with `status: archived` or
+     paths under `topics/.archive/`
    - Show a summary table: wiki name, description, source count, article count
+   - Show `Archived topics: N` and suggest `/wiki:archive list --archived` when
+     N > 0
    - Show global log (last 5 entries)
 
 2. If targeting a specific topic wiki (`--wiki <name>` or local):

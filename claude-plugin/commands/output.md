@@ -1,6 +1,6 @@
 ---
-description: "Generate output artifacts from wiki content — summaries, reports, study guides, slide outlines, timelines, glossaries, comparisons. Outputs are filed back into the wiki."
-argument-hint: "<type> [--topic <topic>] [--sources <paths>] [--with <wiki>...] [--wiki <name>] [--local]"
+description: "Generate output artifacts from active wiki content — summaries, reports, study guides, slide outlines, timelines, glossaries, comparisons. Outputs are filed back into the wiki."
+argument-hint: "<type> [--topic <topic>] [--sources <paths>] [--with <wiki>...] [--include-archived] [--wiki <name>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(date:*), Bash(python3:*)
 ---
 
@@ -28,6 +28,13 @@ tracking state in a generated report.
 - **--sources <paths>**: Comma-separated list of specific wiki article paths to use
 - **--with <wiki>**: Load a supplementary wiki as additional context. The primary wiki (`--wiki`) provides the **subject** (what to write about); `--with` wikis provide **craft/skill** knowledge (how to write it). Multiple `--with` flags allowed. Example: `--wiki quantum-computing --with article-writing` uses quantum-computing for domain content and article-writing for structure, hooks, and writing techniques.
 - **--retardmax**: Ship it NOW. Don't agonize over structure or completeness. Generate a rough-but-useful output fast, covering everything the wiki has. Better to have something imperfect now than something perfect never.
+- **--include-archived**: Explicitly allow archived primary or supplementary
+  wiki context. Label archived-derived material in the generated output.
+
+Archived wikis are excluded by default, including from `--retardmax`. If the
+primary target or a `--with` wiki is archived, stop unless
+`--include-archived` is present. Never silently mix archived citations into an
+active output.
 
 ### Output Types
 

@@ -1,6 +1,6 @@
 ---
 description: "Track wiki-adjacent things the user cares about: items, ingest candidates, entities, corpora, open questions, tasks, and other durable inventory records."
-argument-hint: "list [--kind <kind>] [--status <status>] [--priority p0-p4] [--view summary|actions|items|records|sources] [--limit N] [--format table|list] | add <kind> \"<title>\" [--priority p0-p4] [--source <path-or-url>] | show <slug-or-path> | update <path> | save-view \"<name>\" [filters] | scan-outputs [--dry-run] | migrate-output <output-path> [--kind <kind>] [--dry-run|--apply] [--wiki <name>] [--local]"
+argument-hint: "list [--kind <kind>] [--status <status>] [--priority p0-p4] [--view summary|actions|items|records|sources] [--limit N] [--format table|list] | add <kind> \"<title>\" [--priority p0-p4] [--source <path-or-url>] | show <slug-or-path> | update <path> | save-view \"<name>\" [filters] | scan-outputs [--dry-run] | migrate-output <output-path> [--kind <kind>] [--dry-run|--apply] [--include-archived] [--wiki <name>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*)
 ---
 
@@ -11,6 +11,12 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found. Run `/wiki init` first."
+
+Archive rule: inventory commands operate on active topic wikis by default. If a
+named target is archived, stop and ask the user to restore it or rerun with
+`--include-archived`. When explicitly included, list/update records only inside
+that archived topic path and label the result as archived. Do not let archived
+inventory records from archived topics appear in default cross-wiki summaries.
 
 After resolving the wiki, read the inventory reference at `skills/wiki-manager/references/inventory.md`, then run the requested subcommand.
 
@@ -55,6 +61,10 @@ Statuses:
 
 Priorities:
 `p0`, `p1`, `p2`, `p3`, `p4`, where `p0` is highest.
+
+Archive flag:
+`--include-archived` explicitly allows the selected wiki itself to be archived.
+This is separate from inventory record `status: archived`.
 
 ### Ensure Structure
 

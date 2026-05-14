@@ -19,6 +19,8 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, th
 
 ## Changelog
 
+**v0.9.0** — **Topic archive lifecycle.** Whole topic wikis can now be archived under `topics/.archive/` so old interests stay preserved but out of normal context. Query, ingest, compile, research, output, inventory, datasets, projects, librarian, refresh, audit, lint, init, and routing now distinguish active material from explicitly included archived context.
+
 **v0.8.7** — **iCloud permission diagnostics.** When macOS lets Codex stat an iCloud hub path but denies actual reads or directory listings, the local CLI now reports the real privacy-permission problem instead of calling the registry invalid or suggesting a machine-local fallback path.
 
 **v0.8.6** — **Lint repair correctness.** `lint --fix` now repairs legacy article frontmatter, rewrites fuzzy raw source refs to exact paths when resolution is unambiguous, regenerates stale directory indexes, ignores maintenance backup indexes under `.librarian/`, and creates an explicit uncompiled-source coverage reference instead of leaving raw coverage gaps as endless suggestions.
@@ -28,8 +30,6 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, th
 **v0.8.4** — **Portable iCloud hub resolution.** Shared wiki folders now survive moving between Macs with different `/Users/<name>/...` paths: agents prefer portable `hub_path`, treat legacy `resolved_path` values as fallback caches, resolve `wikis.json` paths relative to the current hub, and fall back to populated `topics/<slug>/` directories when registry entries are stale or unreadable.
 
 **v0.8.0** — **Inventory tracking and dataset manifests.** Added first-class `/wiki:inventory` for durable items, candidates, entities, corpora, saved views, and opinionated migration previews, plus `/wiki:dataset` manifests for large or external datasets that should be indexed by the wiki without being copied into it. Lint, query, ingest, research, audit, plan, and output workflows now know how to surface inventory and dataset state while keeping raw evidence, compiled knowledge, and generated artifacts separate.
-
-**v0.7.0** — **PDF, message archive, and Wayback adapters.** PDF ingest now prefers real markdown extraction over metadata stubs, with `pdftotext` plus Python-library fallback guidance. Collection ingestion now covers CSV/TSV/JSON/JSONL message archives as per-message markdown sources and Internet Archive CDX inventories as readability-to-markdown Wayback snapshot imports.
 
 ## Install
 
@@ -337,6 +337,9 @@ Check your installed version:
 /wiki:dataset add "Bitcointalk Temporal Graph" --location https://figshare.com/articles/dataset/BitcoinTemporalGraph/26305093 --wiki bitcoin  # Index data that stays external
 /wiki:dataset list --view schema --limit 10      # Compact chat table of dataset schema/readiness state
 /wiki:dataset scan-outputs --dry-run            # Find legacy data reports that could become dataset manifests
+/wiki:archive topic old-interest --reason "No longer active"  # Preserve a topic but hide it from normal context
+/wiki:archive list --archived                   # Show active and archived topic wikis
+/wiki:archive restore old-interest              # Bring an archived topic back
 /wiki:compile                                     # Compile any unprocessed sources
 /wiki:audit --project gut-brain-playbook          # Truth-seeking audit across outputs + wiki + fresh research
 /wiki:output report --topic gut-brain             # Generate a report
@@ -351,11 +354,15 @@ checks without an agent:
 ```bash
 ./scripts/llm-wiki lint /path/to/wiki
 ./scripts/llm-wiki lint --fix /path/to/wiki
+./scripts/llm-wiki archive --hub /path/to/hub topic old-interest --reason "No longer active"
+./scripts/llm-wiki archive --hub /path/to/hub list --archived
+./scripts/llm-wiki archive --hub /path/to/hub restore old-interest
 ```
 
 This local helper covers structural checks that do not require an LLM. The
 agentic `/wiki:lint` workflow remains the full protocol for editorial and deep
-verification passes.
+verification passes. The local archive helper performs the deterministic
+folder move plus `wikis.json`, hub index, and log updates.
 
 ## Commands
 
@@ -381,11 +388,16 @@ verification passes.
 | `/wiki:dataset add "title" --location <path-or-url>` | Add a dataset manifest without copying data into the wiki |
 | `/wiki:dataset profile <slug> --dry-run` | Preview lightweight profiling of size, format, headers, or schema observations |
 | `/wiki:dataset migrate-output <path> --apply` | Additively create dataset manifests from a legacy output; never moves or copies the underlying data |
+| `/wiki:archive list [--archived]` | List active topic wikis and optionally archived topic wikis |
+| `/wiki:archive topic <slug> --reason "why"` | Move a topic wiki to `topics/.archive/<slug>` and hide it from default context |
+| `/wiki:archive restore <slug>` | Restore an archived topic wiki to active status |
+| `/wiki:archive peek <query>` | Search archived topic indexes without reading archived articles |
 | `/wiki:compile` | Compile new sources into wiki articles |
 | `/wiki:compile --full` | Recompile everything from scratch |
 | `/wiki:query <question>` | Q&A against the wiki (standard depth) |
 | `/wiki:query <question> --quick` | Fast answer from indexes only |
 | `/wiki:query <question> --deep` | Thorough — reads everything, checks raw + sibling wikis |
+| `/wiki:query <question> --include-archived` | Explicitly search/read archived material, with archived citations labeled |
 | `/wiki:query <terms> --list` | Find content by keyword, tag, or category (replaces old `/wiki:search`) |
 | `/wiki:query --resume` | Reload context after a session break — recent activity, stats, last-updated articles |
 | `/wiki:plan <goal>` | Generate wiki-grounded implementation plan (interview → gap research → phased plan) |
@@ -417,7 +429,7 @@ verification passes.
 | `/wiki:assess <path>` | Assess a repo against wiki research + market. Gap analysis. |
 | `/wiki:assess <path> --retardmax` | Wide net — adds adjacent fields and failure analysis |
 
-All commands accept `--wiki <name>` to target a specific topic wiki and `--local` to target the project wiki. Commands that generate content (`query`, `output`, `plan`) also accept `--with <wiki>` to load supplementary wikis as cross-wiki context — e.g., `--with article-writing` applies writing craft knowledge when generating output from a domain wiki.
+All commands accept `--wiki <name>` to target a specific topic wiki and `--local` to target the project wiki. Archived topic wikis are skipped by default; commands that support `--include-archived` require that explicit flag before reading or writing archived material. Commands that generate content (`query`, `output`, `plan`) also accept `--with <wiki>` to load supplementary wikis as cross-wiki context — e.g., `--with article-writing` applies writing craft knowledge when generating output from a domain wiki.
 
 `/wiki:librarian` is the focused wiki-maintenance tool. `/wiki:audit` is broader and may perform fresh research to decide whether the current knowledge or generated outputs are still trustworthy.
 
@@ -446,6 +458,7 @@ All commands accept `--wiki <name>` to target a specific topic wiki and `--local
     │   ├── config.md
     │   └── log.md
     ├── woodworking/                    # Another topic wiki
+    ├── .archive/                       # Archived topic wikis, hidden by default
     └── ...
 ```
 
@@ -457,12 +470,13 @@ The hub is just a registry — no content directories, no `.obsidian/`. All cont
 2. **Ingest** additional sources — URLs, files, text, tweets (via Grok MCP), or bulk via inbox
 3. **Inventory** items, candidates, entities, corpora, watch lists, and next actions that should persist; the agent tells you when inventory is the wrong layer
 4. **Index datasets** that are too large for markdown — manifests, profiles, samples, and query recipes
-5. **Compile** raw sources into synthesized wiki articles with cross-references and confidence scores
-6. **Query** the wiki — quick (indexes), standard (articles), or deep (everything)
-7. **Lessons learned** — extract knowledge from the current session (errors, fixes, gotchas) into the wiki
-8. **Assess** a repo against the wiki — gap analysis: what aligns, what's missing, what the market offers
-9. **Lint** for consistency — broken links, missing indexes, orphan articles
-10. **Output** artifacts — summaries, reports, slides — filed back into the wiki
+5. **Archive** whole topic wikis that should stay preserved but quiet
+6. **Compile** raw sources into synthesized wiki articles with cross-references and confidence scores
+7. **Query** the wiki — quick (indexes), standard (articles), or deep (everything active, archived indexes separated)
+8. **Lessons learned** — extract knowledge from the current session (errors, fixes, gotchas) into the wiki
+9. **Assess** a repo against the wiki — gap analysis: what aligns, what's missing, what the market offers
+10. **Lint** for consistency — broken links, missing indexes, orphan articles, archive registry drift
+11. **Output** artifacts — summaries, reports, slides — filed back into the wiki
 
 ### Key Design
 
@@ -472,6 +486,9 @@ The hub is just a registry — no content directories, no `.obsidian/`. All cont
 - **Articles are synthesized**, not copied — they explain, contextualize, cross-reference.
 - **Raw is immutable** — once ingested, sources are never modified.
 - **Multi-wiki aware** — queries peek at sibling wiki indexes for overlap.
+- **Archive-aware** — archived topic wikis stay preserved under
+  `topics/.archive/` but are hidden from default query/compile/research/output
+  and maintenance workflows.
 - **Dual-linking** — both `[[wikilinks]]` (Obsidian) and standard markdown links on every cross-reference. Works everywhere.
 - **Confidence scoring** — articles rated high/medium/low based on source quality and corroboration.
 - **Structural guardian** — auto-checks wiki integrity after operations, fixes trivial issues silently.
@@ -574,8 +591,12 @@ Claude Code is the compiler. Obsidian is an optional viewer.
 |-------|------|-------------|
 | Quick | `--quick` | Reads indexes only. Fastest. For simple lookups. |
 | Standard | *(default)* | Reads relevant articles + full-text search. For most questions. |
-| Deep | `--deep` | Reads everything, searches raw sources, peeks sibling wikis. For complex questions. |
+| Deep | `--deep` | Reads everything active, searches raw sources, peeks sibling wikis, and surfaces archived index matches separately. |
 | List | `--list` | Returns ranked article list instead of synthesized answer. Supports `--tag` and `--category` filters. |
+
+Archived topics are excluded from quick, standard, and list results unless you
+pass `--include-archived`. Deep mode may show archived index hits, but it does
+not cite archived material as active evidence without explicit inclusion.
 
 ## Credits
 

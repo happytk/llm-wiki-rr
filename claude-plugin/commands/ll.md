@@ -1,6 +1,6 @@
 ---
 description: "Extract lessons learned from the current session. Scans conversation for error→fix patterns, user corrections, and discoveries, then saves structured lessons to the wiki."
-argument-hint: "[\"topic hint\"] [--wiki <name>] [--local] [--dry-run] [--rules]"
+argument-hint: "[\"topic hint\"] [--wiki <name>] [--local] [--dry-run] [--rules] [--include-archived]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*)
 ---
 
@@ -11,6 +11,12 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing and no wiki matches the session topic → offer to create one with `--new-topic`; otherwise target the most relevant existing wiki.
+
+Archive rule: lessons learned go to active topic wikis by default. Skip
+archived topics when auto-targeting by session topic. If `--wiki <name>`
+resolves to an archived topic, stop and ask the user to restore it or rerun
+with `--include-archived`; explicit archived writes must stay inside the
+archived topic path and keep it archived.
 
 Extract lessons learned from the current session and save them to the wiki's knowledge pipeline.
 
@@ -26,6 +32,8 @@ is status, priority, or a next action to track.
 - **--local**: Use project-local `.wiki/`
 - **--dry-run**: Show extracted lessons without writing anything
 - **--rules**: Also suggest CLAUDE.md / AGENTS.md rule additions
+- **--include-archived**: Explicitly allow writing lessons to an archived
+  target wiki.
 
 ### What This Command Does
 

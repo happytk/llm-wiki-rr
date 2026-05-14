@@ -1,6 +1,6 @@
 ---
 description: "Manage projects inside a topic wiki. Projects are folders under output/projects/ that group related outputs (playbooks, images, code, data) with a goal captured in WHY.md."
-argument-hint: "new <slug> \"goal\" | list [--archived] | show <slug> | add <slug> <path> | archive <slug>"
+argument-hint: "new <slug> \"goal\" | list [--archived] | show <slug> | add <slug> <path> | archive <slug> [--include-archived]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(mkdir:*), Bash(mv:*), Bash(date:*), Bash(basename:*), Bash(find:*), Bash(wc:*)
 ---
 
@@ -13,6 +13,13 @@ Manage projects — folders inside a topic wiki's `output/projects/` directory t
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` if found. Variant: **wiki-neutral** — see deviation below for the step-4 fallback.
+
+Archive rule: topic archive and project archive are different layers. Project
+commands operate on active topic wikis by default. If `--wiki <name>` resolves
+to a topic under `topics/.archive/`, stop and ask the user to restore the topic
+or rerun with `--include-archived`; explicit archived operations must stay
+inside that archived topic path. The project subcommand `archive <slug>` only
+moves `output/projects/<slug>` inside the selected topic wiki.
 
 Read the projects architecture at `skills/wiki-manager/references/projects.md` for the full rationale — particularly *why* `WHY.md` is the only required file (it holds the precious, non-derivable rationale) and *why* everything else is derived from filesystem state.
 
@@ -39,6 +46,11 @@ The first word is the subcommand. Subsequent words are args.
 | `archive` | `<slug>` | Move folder to `.archive/` (reversible via mv) |
 
 If `$ARGUMENTS` is empty, show help (list subcommands with examples) and exit.
+
+Flag:
+- **--include-archived**: Explicitly allow the selected topic wiki itself to be
+  archived. This is separate from `list --archived`, which includes archived
+  projects inside an active topic wiki.
 
 **Removed in v0.2 simplification**: `focus`, `unfocus`, `retract`, `rename`. See `references/projects.md` § "Focus" for the rationale on dropping focus (pass `--project <slug>` explicitly instead). Rename and retract are rare and better done via direct filesystem ops (`mv`, `rm -rf`) than wrapped subcommands.
 

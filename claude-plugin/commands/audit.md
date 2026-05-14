@@ -1,6 +1,6 @@
 ---
-description: "Truth-seeking umbrella audit for llm-wiki. Combines wiki maintenance, output drift checks, provenance review, and fresh research when trust is in doubt."
-argument-hint: "scan [--artifact <path>] [--project <slug>] [--wiki-only] [--outputs-only] [--quick] [--fresh] | report [--wiki <name>] [--local]"
+description: "Truth-seeking umbrella audit for llm-wiki. Combines active wiki maintenance, output drift checks, provenance review, and fresh research when trust is in doubt."
+argument-hint: "scan [--artifact <path>] [--project <slug>] [--wiki-only] [--outputs-only] [--quick] [--fresh] [--include-archived] | report [--wiki <name>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), WebFetch, WebSearch, Agent
 ---
 
@@ -35,6 +35,8 @@ Flags:
 - **--outputs-only**: Skip the wiki-wide pass and focus on outputs plus their dependency chains
 - **--quick**: Local-only audit. Skip fresh web research unless the user explicitly demands it.
 - **--fresh**: Ignore cached `.librarian/scan-results.json` and run a fresh wiki-content pass first
+- **--include-archived**: Explicitly include archived topic wikis. Default full
+  audits skip archived material unless the target artifact depends on it.
 - **--wiki <name>**: Target a specific topic wiki
 - **--local**: Use project-local `.wiki/`
 
@@ -50,6 +52,11 @@ Flags:
    - `--outputs-only` -> all markdown outputs under `output/`, excluding `_index.md` and `WHY.md`
    - default -> full umbrella audit
 3. Record the scope, timestamp, and selected flags for the report.
+
+Archive rule: default full-scope audit skips archived topic wikis. If the
+targeted artifact/source chain explicitly cites archived material, follow that
+dependency and label it as archived. For broad archived audits, require
+`--include-archived`.
 
 #### 1. Wiki-content pass
 

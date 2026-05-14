@@ -1385,6 +1385,52 @@ def resolve_registry_path(raw_path: str, hub: Path) -> Path:
     return hub / path
 
 
+def is_archived_registry_entry(entry: dict[str, Any] | None) -> bool:
+    if not entry:
+        return False
+    status = str(entry.get("status") or "")
+    path = str(entry.get("path") or "")
+    return status == "archived" or path.startswith("topics/.archive/")
+
+
+def read_registry(hub: Path) -> dict[str, Any]:
+    registry = hub / "wikis.json"
+    try:
+        return json.loads(registry.read_text(encoding="utf-8"))
+    except OSError as exc:
+        if is_permission_denied(exc):
+            raise SystemExit(permission_denied_message(registry, "read wiki registry", exc)) from exc
+        raise SystemExit(f"could not read wiki registry {registry}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"invalid wiki registry {registry}: {exc}") from exc
+
+
+def write_registry(hub: Path, data: dict[str, Any]) -> None:
+    registry = hub / "wikis.json"
+    registry.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+
+
+def topic_entry(data: dict[str, Any], slug: str) -> dict[str, Any] | None:
+    entry = data.get("wikis", {}).get(slug)
+    return entry if isinstance(entry, dict) else None
+
+
+def active_topic_path(hub: Path, slug: str, entry: dict[str, Any] | None = None) -> Path:
+    if entry and entry.get("path") and not is_archived_registry_entry(entry):
+        return resolve_registry_path(str(entry["path"]), hub)
+    return hub / "topics" / slug
+
+
+def archived_topic_path(hub: Path, slug: str, entry: dict[str, Any] | None = None) -> Path:
+    if entry and entry.get("path") and is_archived_registry_entry(entry):
+        return resolve_registry_path(str(entry["path"]), hub)
+    return hub / "topics" / ".archive" / slug
+
+
+def is_initialized_topic(path: Path) -> bool:
+    return (path / "_index.md").exists() and (path / "config.md").exists()
+
+
 def resolve_wiki_root(args: argparse.Namespace) -> Path:
     if args.path:
         return expand_leading_tilde(str(args.path))
@@ -1394,9 +1440,17 @@ def resolve_wiki_root(args: argparse.Namespace) -> Path:
     if args.wiki:
         registry = hub / "wikis.json"
         fallback_topic = hub / "topics" / args.wiki
+        fallback_archived_topic = hub / "topics" / ".archive" / args.wiki
+        include_archived = bool(getattr(args, "include_archived", False))
         if not registry.exists():
             if initialized_wiki_root(fallback_topic):
                 return fallback_topic
+            if initialized_wiki_root(fallback_archived_topic):
+                if include_archived:
+                    return fallback_archived_topic
+                raise SystemExit(
+                    f"wiki is archived: {args.wiki}. Use --include-archived or restore it first."
+                )
             raise SystemExit(f"wiki registry not found: {registry}")
         try:
             data = json.loads(registry.read_text(encoding="utf-8"))
@@ -1405,22 +1459,50 @@ def resolve_wiki_root(args: argparse.Namespace) -> Path:
                 raise SystemExit(permission_denied_message(registry, "read wiki registry", exc)) from exc
             if initialized_wiki_root(fallback_topic):
                 return fallback_topic
+            if initialized_wiki_root(fallback_archived_topic):
+                if include_archived:
+                    return fallback_archived_topic
+                raise SystemExit(
+                    f"wiki is archived: {args.wiki}. Use --include-archived or restore it first."
+                )
             raise SystemExit(f"could not read wiki registry {registry}: {exc}") from exc
         except json.JSONDecodeError as exc:
             if initialized_wiki_root(fallback_topic):
                 return fallback_topic
+            if initialized_wiki_root(fallback_archived_topic):
+                if include_archived:
+                    return fallback_archived_topic
+                raise SystemExit(
+                    f"wiki is archived: {args.wiki}. Use --include-archived or restore it first."
+                )
             raise SystemExit(f"invalid wiki registry {registry}: {exc}") from exc
         entry = data.get("wikis", {}).get(args.wiki)
         if not entry or not entry.get("path"):
             if initialized_wiki_root(fallback_topic):
                 return fallback_topic
+            if initialized_wiki_root(fallback_archived_topic):
+                if include_archived:
+                    return fallback_archived_topic
+                raise SystemExit(
+                    f"wiki is archived: {args.wiki}. Use --include-archived or restore it first."
+                )
             raise SystemExit(f"wiki not found in registry: {args.wiki}")
+        if is_archived_registry_entry(entry) and not include_archived:
+            raise SystemExit(
+                f"wiki is archived: {args.wiki}. Use --include-archived or restore it first."
+            )
         registry_path = resolve_registry_path(str(entry["path"]), hub)
         if (
             not initialized_wiki_root(registry_path)
             and initialized_wiki_root(fallback_topic)
         ):
             return fallback_topic
+        if (
+            not initialized_wiki_root(registry_path)
+            and include_archived
+            and initialized_wiki_root(fallback_archived_topic)
+        ):
+            return fallback_archived_topic
         return registry_path
     local = Path.cwd() / ".wiki"
     if local.exists():
@@ -1521,6 +1603,242 @@ def print_text_report(ctx: LintContext) -> None:
     print("Result: " + ("FAIL" if failed else "PASS"))
 
 
+def append_log(path: Path, operation: str, message: str) -> None:
+    log = path / "log.md"
+    if not log.exists():
+        return
+    today = dt.date.today().isoformat()
+    with log.open("a", encoding="utf-8") as handle:
+        handle.write(f"\n## [{today}] {operation} | {message}\n")
+
+
+def topic_title(path: Path, slug: str) -> str:
+    config = path / "config.md"
+    if config.exists():
+        try:
+            text = config.read_text(encoding="utf-8", errors="replace")
+            match = re.search(r'(?m)^title:\s*"?([^"\n]+)"?', text)
+            if match:
+                return match.group(1).strip()
+        except OSError:
+            pass
+    return slug.replace("-", " ").title()
+
+
+def write_hub_index(hub: Path, data: dict[str, Any]) -> None:
+    today = dt.date.today().isoformat()
+    active_rows: list[str] = []
+    archived_count = 0
+    for slug, entry in sorted(data.get("wikis", {}).items()):
+        if slug == "hub":
+            continue
+        if not isinstance(entry, dict):
+            continue
+        if is_archived_registry_entry(entry):
+            archived_count += 1
+            continue
+        raw_path = str(entry.get("path") or f"topics/{slug}")
+        path = resolve_registry_path(raw_path, hub)
+        title = topic_title(path, slug)
+        description = str(entry.get("description") or "")
+        active_rows.append(
+            f"| [{table_cell(slug)}]({markdown_link_destination(raw_path)}) | {table_cell(title)} | {table_cell(description)} |"
+        )
+
+    text = "\n".join(
+        [
+            "# Wiki Hub Index",
+            "",
+            "> Registry of active topic wikis.",
+            "",
+            f"Last updated: {today}",
+            "",
+            "## Statistics",
+            "",
+            f"- Active topics: {len(active_rows)}",
+            f"- Archived topics: {archived_count}",
+            "",
+            "## Topic Wikis",
+            "",
+            "| Wiki | Title | Description |",
+            "|------|-------|-------------|",
+            *active_rows,
+            "",
+            "## Archive",
+            "",
+            f"Archived topics are preserved under `topics/.archive/`: {archived_count}",
+            "",
+        ]
+    )
+    (hub / "_index.md").write_text(text, encoding="utf-8")
+
+
+def ensure_hub_for_archive(hub: Path) -> dict[str, Any]:
+    if not (hub / "wikis.json").exists() or not (hub / "topics").exists():
+        raise SystemExit(f"initialized hub not found: {hub}")
+    return read_registry(hub)
+
+
+def run_archive(args: argparse.Namespace) -> int:
+    hub = resolve_hub(args)
+    data = ensure_hub_for_archive(hub)
+    subcommand = args.archive_command
+    if subcommand == "list":
+        return archive_list(hub, data, include_archived=args.archived, json_output=args.json)
+    if subcommand == "topic":
+        return archive_topic(hub, data, args.slug, args.reason)
+    if subcommand == "restore":
+        return restore_topic(hub, data, args.slug)
+    raise SystemExit("unknown archive subcommand")
+
+
+def archive_list(
+    hub: Path,
+    data: dict[str, Any],
+    include_archived: bool,
+    json_output: bool = False,
+) -> int:
+    active: list[dict[str, str]] = []
+    archived: list[dict[str, str]] = []
+    for slug, entry in sorted(data.get("wikis", {}).items()):
+        if slug == "hub" or not isinstance(entry, dict):
+            continue
+        path_text = str(entry.get("path") or f"topics/{slug}")
+        row = {
+            "slug": slug,
+            "path": path_text,
+            "description": str(entry.get("description") or ""),
+            "archived": str(entry.get("archived") or ""),
+            "reason": str(entry.get("archive_reason") or ""),
+        }
+        if is_archived_registry_entry(entry):
+            archived.append(row)
+        else:
+            active.append(row)
+
+    archive_dir = hub / "topics" / ".archive"
+    if archive_dir.exists():
+        registered = {row["slug"] for row in archived}
+        for topic in sorted(child for child in archive_dir.iterdir() if child.is_dir()):
+            if topic.name not in registered and initialized_wiki_root(topic):
+                archived.append(
+                    {
+                        "slug": topic.name,
+                        "path": f"topics/.archive/{topic.name}",
+                        "description": "(missing from registry)",
+                        "archived": "",
+                        "reason": "registry repair needed",
+                    }
+                )
+
+    if json_output:
+        print(json.dumps({"hub": str(hub), "active": active, "archived": archived}, indent=2))
+        return 0
+
+    print(f"llm-wiki archive: {hub}")
+    print(f"\nActive topics ({len(active)})")
+    print("| Slug | Path | Description |")
+    print("|------|------|-------------|")
+    for row in active:
+        print(f"| {row['slug']} | {row['path']} | {table_cell(row['description'])} |")
+    print(f"\nArchived topics: {len(archived)}")
+    if include_archived:
+        print("\nArchived topics")
+        print("| Slug | Path | Archived | Reason |")
+        print("|------|------|----------|--------|")
+        for row in archived:
+            print(
+                f"| {row['slug']} | {row['path']} | {row['archived']} | {table_cell(row['reason'])} |"
+            )
+    elif archived:
+        print("Run `llm-wiki archive list --archived` to show archived topics.")
+    return 0
+
+
+def archive_topic(hub: Path, data: dict[str, Any], slug: str, reason: str | None) -> int:
+    if slug == "hub":
+        raise SystemExit("cannot archive the synthetic hub entry")
+    entry = topic_entry(data, slug)
+    source = active_topic_path(hub, slug, entry)
+    fallback_source = hub / "topics" / slug
+    if not initialized_wiki_root(source) and initialized_wiki_root(fallback_source):
+        source = fallback_source
+    if entry and is_archived_registry_entry(entry):
+        raise SystemExit(f"topic already archived: {slug}")
+    if not initialized_wiki_root(source):
+        raise SystemExit(f"active topic not found: {source}")
+    archive_dir = hub / "topics" / ".archive"
+    dest = archive_dir / slug
+    if dest.exists():
+        raise SystemExit(f"archive destination already exists: {dest}")
+
+    wikis = data.setdefault("wikis", {})
+    if not isinstance(wikis, dict):
+        raise SystemExit("invalid registry: wikis must be an object")
+
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source), str(dest))
+
+    entry = wikis.setdefault(slug, {})
+    if not isinstance(entry, dict):
+        entry = {}
+        wikis[slug] = entry
+    entry.setdefault("description", topic_title(dest, slug))
+    entry["path"] = f"topics/.archive/{slug}"
+    entry["status"] = "archived"
+    entry["archived"] = dt.date.today().isoformat()
+    if reason:
+        entry["archive_reason"] = reason
+    write_registry(hub, data)
+    write_hub_index(hub, data)
+    append_log(hub, "archive", f"archived topic {slug}")
+    append_log(dest, "archive", f"archived topic {slug}")
+    print(f"Archived topic `{slug}`")
+    print(f"Old path: {source}")
+    print(f"New path: {dest}")
+    print(f"Restore with: llm-wiki archive --hub {hub} restore {slug}")
+    return 0
+
+
+def restore_topic(hub: Path, data: dict[str, Any], slug: str) -> int:
+    if slug == "hub":
+        raise SystemExit("cannot restore the synthetic hub entry")
+    entry = topic_entry(data, slug)
+    source = archived_topic_path(hub, slug, entry)
+    fallback_source = hub / "topics" / ".archive" / slug
+    if not initialized_wiki_root(source) and initialized_wiki_root(fallback_source):
+        source = fallback_source
+    dest = hub / "topics" / slug
+    if dest.exists():
+        raise SystemExit(f"active topic destination already exists: {dest}")
+    if not initialized_wiki_root(source):
+        raise SystemExit(f"archived topic not found: {source}")
+
+    wikis = data.setdefault("wikis", {})
+    if not isinstance(wikis, dict):
+        raise SystemExit("invalid registry: wikis must be an object")
+
+    shutil.move(str(source), str(dest))
+
+    entry = wikis.setdefault(slug, {})
+    if not isinstance(entry, dict):
+        entry = {}
+        wikis[slug] = entry
+    entry.setdefault("description", topic_title(dest, slug))
+    entry["path"] = f"topics/{slug}"
+    entry["status"] = "active"
+    entry.pop("archived", None)
+    entry.pop("archive_reason", None)
+    entry["restored"] = dt.date.today().isoformat()
+    write_registry(hub, data)
+    write_hub_index(hub, data)
+    append_log(hub, "archive", f"restored topic {slug}")
+    append_log(dest, "archive", f"restored topic {slug}")
+    print(f"Restored topic `{slug}`")
+    print(f"Path: {dest}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="llm-wiki",
@@ -1541,8 +1859,41 @@ def build_parser() -> argparse.ArgumentParser:
     lint.add_argument("--local", action="store_true", help="Lint .wiki/ in the current directory.")
     lint.add_argument("--wiki", help="Named wiki from the hub registry.")
     lint.add_argument("--hub", help="Override hub path for --wiki resolution.")
+    lint.add_argument(
+        "--include-archived",
+        action="store_true",
+        help="Allow linting an explicitly targeted archived wiki.",
+    )
     lint.add_argument("--json", action="store_true", help="Print a machine-readable JSON report.")
     lint.set_defaults(func=run_lint)
+
+    archive = subparsers.add_parser(
+        "archive",
+        help="Archive, restore, or list hub topic wikis.",
+        description=(
+            "Move whole topic wikis between topics/<slug> and topics/.archive/<slug>, "
+            "updating wikis.json so archived topics stay out of default context."
+        ),
+    )
+    archive.add_argument("--hub", help="Override hub path for archive operations.")
+    archive_sub = archive.add_subparsers(dest="archive_command", required=True)
+
+    archive_list_parser = archive_sub.add_parser("list", help="List active and archived topics.")
+    archive_list_parser.add_argument(
+        "--archived",
+        action="store_true",
+        help="Show archived topics in addition to active topics.",
+    )
+    archive_list_parser.add_argument("--json", action="store_true", help="Print JSON.")
+
+    archive_topic_parser = archive_sub.add_parser("topic", help="Archive an active topic wiki.")
+    archive_topic_parser.add_argument("slug", help="Topic slug to archive.")
+    archive_topic_parser.add_argument("--reason", help="Optional archive reason.")
+
+    archive_restore_parser = archive_sub.add_parser("restore", help="Restore an archived topic wiki.")
+    archive_restore_parser.add_argument("slug", help="Topic slug to restore.")
+
+    archive.set_defaults(func=run_archive)
 
     return parser
 

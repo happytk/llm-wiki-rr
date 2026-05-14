@@ -42,6 +42,7 @@ The hub is lightweight — NO content, just a registry.
 └── topics/
     ├── nutrition/      # Each topic is a full, isolated wiki
     ├── robotics/
+    ├── .archive/       # Archived topic wikis, hidden by default
     └── ...
 ```
 
@@ -106,7 +107,11 @@ Same structure as a topic wiki but at `<project>/.wiki/`. Add `.wiki/` to `.giti
 7. **Honest gaps.** If the wiki doesn't have the answer, say so. Suggest what to ingest.
 8. **Multi-wiki peek.** When querying, answer from the target wiki, then peek at sibling wiki `_index.md` files for overlap.
 9. **Confidence scoring.** Articles get `confidence: high|medium|low` in frontmatter based on source quality.
-10. **Activity log.** Append every operation to `log.md`. Format: `## [YYYY-MM-DD] operation | Description`. Never edit existing entries.
+10. **Archive is quiet preservation.** Archived topic wikis move to
+`HUB/topics/.archive/<slug>/`, remain structurally maintainable, and stay out of
+normal query/compile/research/output context unless explicitly included. Deep
+queries may surface archived index matches separately.
+11. **Activity log.** Append every operation to `log.md`. Format: `## [YYYY-MM-DD] operation | Description`. Never edit existing entries.
 
 ## File Formats
 
@@ -269,7 +274,14 @@ spaces in markdown, use angle-bracket destinations:
   "default": "<HUB>",
   "wikis": {
     "hub": { "path": "<HUB>", "description": "Hub" },
-    "<name>": { "path": "topics/<name>", "description": "..." }
+    "<name>": { "path": "topics/<name>", "description": "...", "status": "active" },
+    "<archived-name>": {
+      "path": "topics/.archive/<archived-name>",
+      "description": "...",
+      "status": "archived",
+      "archived": "YYYY-MM-DD",
+      "archive_reason": "optional"
+    }
   },
   "local_wikis": []
 }
@@ -282,19 +294,30 @@ paths break when an iCloud wiki is opened from another Mac. If a registry path
 is stale but `HUB/topics/<name>/_index.md` exists, use that topic path and
 repair the registry on the next sync.
 
+Archived topic wikis use portable paths under `topics/.archive/<name>` and
+`status: archived`. Normal tools skip these entries unless the user explicitly
+asks for archived content or structural maintenance.
+
 ### log.md
 
 ```
 ## [YYYY-MM-DD] operation | Description
 ```
 
-Operations: `init`, `ingest`, `ingest-collection`, `compile`, `query`, `lint`, `research`, `thesis`, `output`, `assess`, `refresh`, `librarian`, `audit`, `plan`, `project`, `inventory`, `dataset`, `ll`
+Operations: `init`, `ingest`, `ingest-collection`, `compile`, `query`, `lint`, `research`, `thesis`, `output`, `assess`, `refresh`, `librarian`, `audit`, `plan`, `project`, `inventory`, `dataset`, `archive`, `ll`
 
 ## Operations
 
 ### Init
 
-Create a topic wiki. Always require a topic name. If the hub doesn't exist, create it first (just wikis.json + _index.md + log.md + topics/). Create the core topic wiki structure, empty _index.md files for created directories, config.md, log.md, and optionally .obsidian/ vault config. Create `inventory/`, `datasets/`, and per-dataset sample/profile/query folders lazily when those commands need them.
+Create a topic wiki. Always require a topic name. If the hub doesn't exist,
+create it first (just wikis.json + _index.md + log.md + topics/). Refuse to
+create a new active topic over an existing `HUB/topics/<slug>` or
+`HUB/topics/.archive/<slug>`; if an archived topic has the requested slug, ask
+whether to restore it or choose a different slug. Create the core topic wiki
+structure, empty `_index.md` files for created directories, config.md, log.md,
+and optionally .obsidian/ vault config. Create `inventory/`, `datasets/`, and
+per-dataset sample/profile/query folders lazily when those commands need them.
 
 ### Ingest
 
@@ -384,15 +407,25 @@ Transform raw sources into wiki articles. Incremental by default (only new sourc
 Do not compile inventory records as articles. They may explain priorities or
 next actions, but factual article claims need raw/wiki sources.
 
+Archived topics are skipped by default. If a target wiki is archived, require an
+explicit archived include or restore it first. Compiling an archived target must
+keep all writes inside that archived topic and must not make it active.
+
 ### Query
 
 Answer questions from wiki content only. Three depths:
 
 - **Quick**: Read indexes only. Fastest.
 - **Standard** (default): Read relevant articles + full-text search. Follow See Also links.
-- **Deep**: Read everything, search raw sources, peek sibling wikis.
+- **Deep**: Read everything active, search raw sources, peek sibling wikis.
 
 Always cite sources. Note confidence levels. Identify gaps. Never use training data — only wiki content.
+
+Archived topic wikis are excluded from quick, standard, and list queries. Deep
+queries may read archived sibling `_index.md` files and report a separate
+Archived Matches section, but archived article bodies and raw sources are read
+only when the user explicitly includes archived content. Label archived
+citations clearly.
 
 For meta-questions about inventory, candidates, backlogs, or next actions, read
 inventory indexes and answer as an operational listing. For factual questions,
@@ -534,6 +567,27 @@ already exists, but it should not create a completely absent empty `datasets/`
 tree or unused per-dataset sample/profile/query folders, and it must never convert content.
 Output-to-dataset migration is explicit, dry-run-first, and additive.
 
+### Archive
+
+Quietly preserve whole topic wikis the user no longer wants in normal context.
+Archive is hub-level in v1; do not move project-local `.wiki/` directories and
+do not archive individual `raw/` or `wiki/` files.
+
+Subcommands:
+- **list**: Show active topics and archived counts; `--archived` shows archived topics too
+- **topic <slug>**: Move `HUB/topics/<slug>` to `HUB/topics/.archive/<slug>` and set `wikis.json` status to `archived`
+- **restore <slug>**: Move `HUB/topics/.archive/<slug>` back to `HUB/topics/<slug>` and set status to `active`
+- **peek <query>**: Search archived topic indexes only, without reading archived article bodies
+
+Other tools hide archive by default. Query, output, plan, and assess only use
+archived material with explicit archived inclusion. Compile, ingest,
+ingest-collection, research, inventory, dataset, project, and lessons-learned
+reject an archived target unless the user restores or explicitly includes it,
+and explicit archived writes must stay inside the archived topic path. Librarian
+and refresh skip archived topics so old interests do not create maintenance
+chores. Audit follows archived dependencies only when the audited artifact cites
+them.
+
 ### Lint
 
 Health checks with auto-fix capability. Lint **is** the migration path — there is no separate `/wiki:migrate` command. A file in the wrong place from an old wiki layout and a file in the wrong place from user error are treated as the same defect. Three layers:
@@ -542,12 +596,15 @@ Health checks with auto-fix capability. Lint **is** the migration path — there
 - **Project-level (C8/C9)** — `output/projects/` structure, `WHY.md` presence, staleness detection, and grouping candidates. Migration of legacy `_project.md` manifests (from pre-v0.2 wikis) is auto-fixed (C8c); everything else is surfaced as suggestions or ready-to-paste commands.
 - **Inventory-level (C16)** — `inventory/` structure, record/view schemas, and output-to-inventory migration candidates. Missing empty structure is a suggestion; partially existing structure is repairable; content migration is human-gated.
 - **Dataset-level (C17)** — `datasets/` structure, manifest schema, and output-to-dataset migration candidates. Missing empty structure is a suggestion; partially existing structure is repairable; content migration is human-gated.
+- **Archive-level (C19)** — `HUB/topics/.archive/` lifecycle and `wikis.json`
+  path/status drift. Normal lint reports archived topics as skipped;
+  `--include-archived` or `--archived-only` structurally maintains them.
 
-**Checks**: structure integrity, frontmatter validity (plus legacy key/value aliases C13), canonical placement of raw/wiki files (C11), unknown-file quarantine for raw/wiki/inventory/datasets/root (C12), index consistency, link integrity, source provenance (dangling refs, unresolved retraction markers), tag hygiene, coverage, project `WHY.md` presence (C8a), project staleness via source chain (C8b), legacy `_project.md` migration to `WHY.md` (C8c), project candidates (C9), inventory migration candidates (C16), dataset migration candidates (C17), deep fact-checking (optional).
+**Checks**: structure integrity, frontmatter validity (plus legacy key/value aliases C13), canonical placement of raw/wiki files (C11), unknown-file quarantine for raw/wiki/inventory/datasets/root (C12), index consistency, link integrity, source provenance (dangling refs, unresolved retraction markers), tag hygiene, coverage, project `WHY.md` presence (C8a), project staleness via source chain (C8b), legacy `_project.md` migration to `WHY.md` (C8c), project candidates (C9), inventory migration candidates (C16), dataset migration candidates (C17), archive registry drift and active/archive collisions (C19), deep fact-checking (optional).
 
-**Auto-fix** (`--fix`): rewrite legacy frontmatter keys/values to canonical (C13), move misplaced raw/wiki files to their canonical directory (C11), quarantine unknown files to `inbox/.unknown/` (C12), migrate legacy `_project.md` to `WHY.md` (C8c), repair missing indexes inside existing inventory/dataset layers (C16/C17), missing indexes, orphan files, dead index entries, statistics mismatch, missing bidirectional links, empty frontmatter fields, dangling source references, regenerate projects-aware `output/_index.md`. Never auto-delete unknown directories. Never auto-create `WHY.md` with placeholder goals (C8a is warn-only — manufactured rationale is worse than missing). Never create completely absent optional inventory or dataset trees just to populate placeholders. Never auto-move files into projects (C9 is human-authored via `/wiki:project`). Never auto-migrate output artifacts into inventory or dataset records (C16/C17 are explicit via `/wiki:inventory migrate-output --apply` and `/wiki:dataset migrate-output --apply`). On slug collisions during a placement move, skip and warn.
+**Auto-fix** (`--fix`): rewrite legacy frontmatter keys/values to canonical (C13), move misplaced raw/wiki files to their canonical directory (C11), quarantine unknown files to `inbox/.unknown/` (C12), migrate legacy `_project.md` to `WHY.md` (C8c), repair missing indexes inside existing inventory/dataset layers (C16/C17), repair unambiguous archive registry path/status drift (C19), missing indexes, orphan files, dead index entries, statistics mismatch, missing bidirectional links, empty frontmatter fields, dangling source references, regenerate projects-aware `output/_index.md`. Never auto-delete unknown directories. Never auto-create `WHY.md` with placeholder goals (C8a is warn-only — manufactured rationale is worse than missing). Never create completely absent optional inventory or dataset trees just to populate placeholders. Never auto-move files into projects (C9 is human-authored via `/wiki:project`). Never auto-migrate output artifacts into inventory or dataset records (C16/C17 are explicit via `/wiki:inventory migrate-output --apply` and `/wiki:dataset migrate-output --apply`). Never move topics into or out of archive during lint; archive/restore is explicit. On slug collisions during a placement move, skip and warn.
 
-**Schema evolution**: when canonical paths or frontmatter fields for `raw/`, `wiki/`, `inventory/`, or `datasets/` change, update the rules in `skills/wiki-manager/references/linting.md` (C11/C16/C17 placement maps, C12 allowlist, C13 alias table). When the project model changes, update C8/C9 and `projects.md`. Never write version-specific migration code. Lint rules are the schema.
+**Schema evolution**: when canonical paths or frontmatter fields for `raw/`, `wiki/`, `inventory/`, `datasets/`, or archive lifecycle paths change, update the rules in `skills/wiki-manager/references/linting.md` (C11/C16/C17 placement maps, C12/C19 allowlists, C13 alias table). When the project model changes, update C8/C9 and `projects.md`. Never write version-specific migration code. Lint rules are the schema.
 
 ### Search
 
@@ -579,7 +636,7 @@ keeps the `wiki/` layer in check, audit answers the broader question: can the
 user trust the current knowledge and outputs right now?
 
 **Default behavior**:
-- Reuse or rerun the librarian pass for wiki articles
+- Reuse or rerun the librarian pass for active wiki articles
 - Audit output artifacts across `output/`, `wiki/`, and `raw/` dependency chains
 - Follow the evidence outward when local material is weak, stale, contradictory,
   or missing
@@ -593,11 +650,13 @@ user trust the current knowledge and outputs right now?
 - `unresolved`
 
 Flags: `--artifact <path>`, `--project <slug>`, `--wiki-only`, `--outputs-only`,
-`--quick`, `--fresh`.
+`--quick`, `--fresh`. Archived material is skipped by default unless the
+targeted artifact depends on it or the user explicitly includes archived
+content.
 
 ### Librarian
 
-Content-level wiki maintenance: staleness detection, quality scoring, factual verification, semantic coherence, deduplication. Produces scored reports — never modifies content without confirmation.
+Content-level wiki maintenance: staleness detection, quality scoring, factual verification, semantic coherence, deduplication. Produces scored reports — never modifies content without confirmation. Archived topics are skipped by default.
 
 **Subcommands**:
 - **scan**: Score all wiki articles for staleness and quality. Two-tier: quick metadata scan first, deep content read only for articles below threshold or with `volatility: hot`. Checkpoints after each article for crash recovery. Results to `.librarian/scan-results.json` and `.librarian/REPORT.md`.
@@ -635,6 +694,8 @@ Manage projects within a topic wiki. Projects are folders under `output/projects
 - **archive <slug>**: Mark project as archived
 
 Projects are a lightweight overlay — they don't move or copy wiki content.
+Project archive is separate from topic archive: it moves one folder under
+`output/projects/.archive/` inside the selected topic wiki.
 
 ### Lessons Learned (ll)
 
@@ -642,17 +703,17 @@ Extract lessons from the current session — error→fix patterns, user correcti
 
 **7-stage pipeline**: scan conversation → extract patterns → target topic wiki → write raw note → update relevant articles → suggest rule additions → log.
 
-Flags: `--dry-run` (preview without writing), `--rules` (also propose CLAUDE.md/AGENTS.md rule additions).
+Flags: `--dry-run` (preview without writing), `--rules` (also propose CLAUDE.md/AGENTS.md rule additions), `--include-archived` (explicitly write lessons to an archived topic).
 
 ## Structural Guardian
 
 Auto-run lightweight checks after write operations:
 
-1. Hub should only have wikis.json, _index.md, log.md, topics/. Warn on anything else; never delete hub-level content automatically.
+1. Hub should only have wikis.json, _index.md, log.md, topics/. `topics/.archive/` is allowed for archived topic wikis. Warn on anything else; never delete hub-level content automatically.
 2. Index freshness: file counts match index rows, including inventory and dataset indexes. Ignore maintenance/report directories such as `.librarian/` and `.audit/`. Auto-fix mismatches by regenerating the affected directory index.
 3. Orphan detection: files not in any index → add them.
 4. Missing core topic directories → create with empty _index.md. Inventory and dataset layers are lazy: repair indexes when they already exist, but do not create absent optional trees unless the current inventory or dataset workflow needs them. For older compiled articles, infer safe schema fields from the directory/body and rewrite fuzzy raw-source refs only when they resolve unambiguously.
-5. wikis.json sync: all topic dirs registered with portable relative paths (`topics/<slug>`), stale absolute paths repaired when `HUB/topics/<slug>` exists, no ghost entries.
+5. wikis.json sync: all active topic dirs registered with portable relative paths (`topics/<slug>`), archived topic dirs registered as `topics/.archive/<slug>` with `status: archived`, stale absolute paths repaired when the corresponding topic dir exists, no ghost entries.
 
 Silent when clean. Auto-fix trivial issues. Warn on structural problems. Never block the user.
 

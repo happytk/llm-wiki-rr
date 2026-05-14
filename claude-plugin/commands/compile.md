@@ -1,6 +1,6 @@
 ---
-description: "Compile raw sources into wiki articles. Synthesizes, cross-references, and organizes knowledge."
-argument-hint: "[--full] [--source <path>] [--topic <name>] [--wiki <name>] [--local]"
+description: "Compile raw sources into wiki articles. Synthesizes, cross-references, and organizes active knowledge."
+argument-hint: "[--full] [--source <path>] [--topic <name>] [--include-archived] [--wiki <name>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*)
 ---
 
@@ -21,11 +21,20 @@ why sources were ingested. If compilation completes work represented by an
 inventory record, report the recommended record update instead of silently
 changing operational state.
 
+Archive awareness: compile targets active topic wikis only by default. If the
+resolved `--wiki <name>` path is archived (`wikis.json` status `archived` or
+path under `topics/.archive/`), stop and ask the user to restore the topic or
+rerun with `--include-archived`. When `--include-archived` is present, compile
+only inside that archived topic path and keep it archived; do not use archived
+raw sources to update active articles.
+
 ### Parse $ARGUMENTS
 
 - **--full**: Recompile everything from scratch
 - **--source <path>**: Compile only this specific source file
 - **--topic <name>**: Create or update a specific topic article
+- **--include-archived**: Explicitly compile an archived target wiki. Never
+  makes the wiki active.
 
 ### Compilation Process
 

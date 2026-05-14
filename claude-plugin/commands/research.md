@@ -1,6 +1,6 @@
 ---
-description: "Deep multi-agent research on a topic, question, or thesis. Launches parallel agents to search the web, ingests sources, and compiles them into wiki articles. Thesis mode provides for/against evidence framing with a verdict."
-argument-hint: "<topic|question> [--plan] [--mode thesis \"<claim>\"] [--new-topic] [--sources <N>] [--deep] [--retardmax] [--min-time <duration>] [--wiki <name>] [--local] [--project <slug>]"
+description: "Deep multi-agent research on a topic, question, or thesis. Launches parallel agents to search the web, ingests sources, and compiles them into active wiki articles. Thesis mode provides for/against evidence framing with a verdict."
+argument-hint: "<topic|question> [--plan] [--mode thesis \"<claim>\"] [--new-topic] [--sources <N>] [--deep] [--retardmax] [--min-time <duration>] [--wiki <name>] [--local] [--project <slug>] [--include-archived]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), WebFetch, WebSearch, Agent
 ---
 
@@ -21,6 +21,8 @@ Conduct deep research on the topic in $ARGUMENTS. This is an automated pipeline:
 - **--local**: Use project-local `.wiki/`
 - **--plan**: Decompose the topic into 3-5 independent research paths, present the plan for confirmation, then execute all paths in parallel. Each path gets its own agent group (5 agents standard, 8 with `--deep`). Ingest runs in parallel across paths (each path writes unique raw files); compilation runs once after all paths complete (single pass sees all sources for better cross-referencing). Without `--plan`, research runs a single path as before. See Plan Mode below.
 - **--project <slug>**: Tag all new outputs with this project. The research playbook/summary artifact is saved inside `output/projects/<slug>/` instead of flat `output/`. Compiled wiki articles get `project: <slug>` frontmatter. If the project doesn't exist, fail early with a helpful error. See `references/projects.md` for the projects architecture.
+- **--include-archived**: Explicitly allow researching into an archived target
+  wiki. Keep the target archived and label the session accordingly.
 
 ### `--project <slug>` flag
 
@@ -39,6 +41,16 @@ At the end, propose inventory records only for durable follow-ups: important
 unresolved gaps, item/part decisions, candidate sources/corpora to revisit,
 watch items, or blocked tasks. Do not create a backlog for every minor search tangent. For larger
 pivots, show a 1-3 row sample of proposed records and ask before writing.
+
+### Archive awareness
+
+Research ignores archived topic wikis by default. If `--wiki <name>` resolves to
+an archived registry entry or a path under `topics/.archive/`, stop and ask the
+user to restore it or rerun with `--include-archived`. When no target wiki is
+specified, archived topics may be mentioned as overlap only: read their master
+`_index.md` files, warn that a related archived topic exists, and ask whether
+to restore it or continue fresh. Do not ingest or compile into archived topics
+through auto-classification.
 
 ### Resolve HUB and wiki
 

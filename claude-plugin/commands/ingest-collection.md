@@ -1,6 +1,6 @@
 ---
 description: "Bulk-ingest source collections such as Git doc repos, MediaWiki sources, CSV/JSON message archives, and Wayback CDX snapshots into raw sources."
-argument-hint: "<repo-url|repo-path|mediawiki-url|dump.xml[.bz2|.gz]|csv-json-path|cdx-url|archived-url> [--adapter auto|git|mediawiki-dump|mediawiki-api|csv-messages|wayback-cdx] [--wiki <name>] [--local] [--new-topic <name>] [--limit <N>] [--namespace <id>] [--include <pattern>] [--exclude <pattern>] [--from YYYYMMDD] [--to YYYYMMDD] [--dry-run] [--compile]"
+argument-hint: "<repo-url|repo-path|mediawiki-url|dump.xml[.bz2|.gz]|csv-json-path|cdx-url|archived-url> [--adapter auto|git|mediawiki-dump|mediawiki-api|csv-messages|wayback-cdx] [--wiki <name>] [--local] [--new-topic <name>] [--limit <N>] [--namespace <id>] [--include <pattern>] [--exclude <pattern>] [--from YYYYMMDD] [--to YYYYMMDD] [--dry-run] [--compile] [--include-archived]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), Bash(mv:*), Bash(cp:*), Bash(rm:*), Bash(basename:*), Bash(find:*), Bash(git:*), Bash(curl:*), Bash(python3:*), Bash(bunzip2:*), Bash(gunzip:*)
 ---
 
@@ -13,6 +13,15 @@ Bulk-ingest a collection into the wiki as immutable raw sources. A collection is
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. Wiki location, first match: `--local` → `.wiki/`; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; current directory has `.wiki/` → use it; else → HUB.
 4. If `<wiki>/_index.md` is missing and `--new-topic <name>` is set, create the topic wiki using the init protocol before ingesting. If no wiki exists and no `--new-topic`, stop and ask for a target wiki.
+
+Archive rule: collection ingest skips archived topic wikis by default. If
+`--wiki <name>` resolves to `status: archived` or a path under
+`topics/.archive/`, stop and ask the user to restore it with
+`/wiki:archive restore <name>` or rerun with `--include-archived`. When
+explicitly included, write only inside that archived topic path and keep it
+archived. Auto-classification and `--new-topic` collision checks should treat
+archived topics as unavailable unless the user explicitly restores or includes
+archived context.
 
 Read `skills/wiki-manager/references/ingestion.md` and `skills/wiki-manager/references/wiki-structure.md`, then follow the collection ingestion protocol.
 
@@ -42,6 +51,8 @@ action update.
 - **--from YYYYMMDD / --to YYYYMMDD**: bound Wayback CDX capture timestamps.
 - **--dry-run**: list what would be ingested, write nothing.
 - **--compile**: after raw ingestion, run the normal compile workflow with collection-aware clustering.
+- **--include-archived**: explicitly allow ingestion into an archived target
+  wiki. Keep the topic archived.
 
 ## Adapter detection
 

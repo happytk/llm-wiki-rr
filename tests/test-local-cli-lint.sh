@@ -354,6 +354,63 @@ expect_success \
   "relative wikis.json paths resolve from hub" \
   "$CLI" lint --hub "$relative_hub" --wiki relative-topic
 
+archive_hub="$tmpdir/archive-hub"
+mkdir -p "$archive_hub/topics/archive-topic"
+cp -R "$GOLDEN/." "$archive_hub/topics/archive-topic/"
+cat > "$archive_hub/_index.md" <<'EOF'
+# Hub Index
+EOF
+cat > "$archive_hub/log.md" <<'EOF'
+# Hub Log
+EOF
+cat > "$archive_hub/wikis.json" <<'JSON'
+{
+  "default": "<HUB>",
+  "wikis": {
+    "hub": { "path": "<HUB>", "description": "Hub" },
+    "archive-topic": { "path": "topics/archive-topic", "description": "Archive topic" }
+  },
+  "local_wikis": []
+}
+JSON
+
+set +e
+archive_output="$("$CLI" archive --hub "$archive_hub" topic archive-topic --reason "No longer active" 2>&1)"
+archive_rc=$?
+set -e
+if [ "$archive_rc" -eq 0 ] \
+  && [ -d "$archive_hub/topics/.archive/archive-topic" ] \
+  && [ ! -e "$archive_hub/topics/archive-topic" ] \
+  && grep -q '"status": "archived"' "$archive_hub/wikis.json" \
+  && grep -q 'topics/.archive/archive-topic' "$archive_hub/wikis.json"; then
+  log_pass "archive command moves topic and marks registry archived"
+else
+  log_fail "archive command moves topic and marks registry archived" "$archive_output"
+fi
+
+expect_failure_contains \
+  "archived wiki is rejected by default resolution" \
+  "wiki is archived" \
+  "$CLI" lint --hub "$archive_hub" --wiki archive-topic
+
+expect_success \
+  "archived wiki can be linted explicitly" \
+  "$CLI" lint --hub "$archive_hub" --wiki archive-topic --include-archived
+
+set +e
+restore_output="$("$CLI" archive --hub "$archive_hub" restore archive-topic 2>&1)"
+restore_rc=$?
+set -e
+if [ "$restore_rc" -eq 0 ] \
+  && [ -d "$archive_hub/topics/archive-topic" ] \
+  && [ ! -e "$archive_hub/topics/.archive/archive-topic" ] \
+  && grep -q '"status": "active"' "$archive_hub/wikis.json" \
+  && grep -q 'topics/archive-topic' "$archive_hub/wikis.json"; then
+  log_pass "archive restore moves topic back and marks registry active"
+else
+  log_fail "archive restore moves topic back and marks registry active" "$restore_output"
+fi
+
 bad_registry_hub="$tmpdir/bad-registry-hub"
 mkdir -p "$bad_registry_hub/topics/bad-registry-topic"
 cp -R "$GOLDEN/." "$bad_registry_hub/topics/bad-registry-topic/"

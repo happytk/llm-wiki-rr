@@ -123,5 +123,11 @@ When reading an entry path, resolve in this order:
 
 If a registry entry's path is missing but `HUB/topics/<entry-name>/_index.md`
 exists, use `HUB/topics/<entry-name>` and repair the registry on the next
-wikis.json sync. If `wikis.json` is unreadable but `HUB/topics/` is populated,
-list topic directories by reading each topic's `config.md` and `_index.md`.
+wikis.json sync. If a command explicitly includes archived content and the
+active fallback is missing but `HUB/topics/.archive/<entry-name>/_index.md`
+exists, use `HUB/topics/.archive/<entry-name>` and ensure the registry entry
+has `status: archived`. Normal semantic commands should reject archived entries
+unless they explicitly support archived inclusion. If `wikis.json` is unreadable
+but `HUB/topics/` is populated, list active topic directories by reading each
+topic's `config.md` and `_index.md`; read `topics/.archive/` only for archive
+or explicit archived maintenance workflows.

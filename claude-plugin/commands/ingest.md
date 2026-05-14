@@ -1,6 +1,6 @@
 ---
-description: "Ingest source material into the wiki. Accepts URLs, file paths, PDFs, freeform text, or processes the inbox. Supports tweets via Grok MCP."
-argument-hint: "<url|filepath|\"text\"> [--type articles|papers|repos|notes|data] [--title \"Title\"] [--inbox] [--keep] [--wiki <name>] [--local] [--auto-classify] [--new-topic <name>] [--project <slug>]"
+description: "Ingest source material into an active wiki. Accepts URLs, file paths, PDFs, freeform text, or processes the inbox. Supports tweets via Grok MCP."
+argument-hint: "<url|filepath|\"text\"> [--type articles|papers|repos|notes|data] [--title \"Title\"] [--inbox] [--keep] [--wiki <name>] [--local] [--auto-classify] [--new-topic <name>] [--project <slug>] [--include-archived]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), Bash(basename:*), Bash(file:*), Bash(curl:*), Bash(mktemp:*), Bash(rm:*), Bash(pdftotext:*), Bash(python3:*), WebFetch, WebSearch
 ---
 
@@ -45,6 +45,14 @@ cheap. If a matching record exists, report the suggested linkage and status
 change (`sources:` add raw path, maybe status `ingested`) instead of silently
 leaving the tracking state stale.
 
+### Archive awareness
+
+Do not ingest into archived topic wikis by default. If `--wiki <name>` resolves
+to `status: archived` or a path under `topics/.archive/`, stop and ask the user
+to restore it with `/wiki:archive restore <name>` or rerun with
+`--include-archived`. If the user explicitly includes archived content, write
+only inside that archived topic path and keep the topic archived.
+
 ### `--new-topic` branch
 
 When `--new-topic` is set, override the standard resolution:
@@ -70,6 +78,8 @@ There is no ambient project focus — pass `--project` explicitly when you want 
 - **--type**: Force source type (articles, papers, repos, notes, data). Default: auto-detect.
 - **--title**: Override extracted title
 - **--auto-classify**: For single items, classify into the best-matching topic wiki instead of requiring `--wiki`. Always active for `--inbox` when no `--wiki` is set.
+- **--include-archived**: Explicitly allow ingestion into an archived target
+  wiki. Not used for auto-classification.
 - **Source**: Everything else — URL (starts with http), file path (contains / or .), or quoted freeform text
 
 ### If --inbox
@@ -136,7 +146,7 @@ When the wiki resolved to the hub (HUB) and no `--wiki` flag was provided, route
 If `--auto-classify` is set, or the user didn't specify `--wiki`:
 
 1. Read `HUB/wikis.json` to list topic wikis
-2. For each topic wiki with a `config.md`, read the description/scope (first 5 lines is enough)
+2. For each active topic wiki with a `config.md`, read the description/scope (first 5 lines is enough). Skip archived topics.
 3. Match the source's title + summary + tags against wiki scopes
 4. Present a simple numbered choice:
    ```

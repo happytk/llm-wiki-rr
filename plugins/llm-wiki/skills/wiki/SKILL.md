@@ -2,14 +2,14 @@
 name: wiki
 description: >
   LLM-compiled knowledge base manager for Codex. Use it to initialize, ingest,
-  import source collections, track inventory, index datasets, compile, query, lint, audit, research, plan, and generate outputs from topic-scoped wikis.
+  import source collections, track inventory, index datasets, archive old topics, compile, query, lint, audit, research, plan, and generate outputs from topic-scoped wikis.
   Activates when the user mentions wiki workflows, knowledge-base management,
   ingestion, collection ingestion, import wiki, inventory, source queue,
   candidate list, watch list, backlog, dataset, large data, data registry,
   dataset manifest, compilation, querying, linting, audit, research, librarian,
   scan quality, article quality, content review, output drift, provenance,
-  implementation plan, or uses /wiki-style shorthand in a repo with .wiki/,
-  ~/wiki/, or a configured hub path.
+  archive wiki, archive topic, restore wiki, implementation plan, or uses
+  /wiki-style shorthand in a repo with .wiki/, ~/wiki/, or a configured hub path.
 ---
 
 # LLM Wiki Manager
@@ -69,6 +69,12 @@ See [references/wiki-structure.md](references/wiki-structure.md) for the complet
 
 9. **Chunk large writes.** Never create files longer than ~200 lines in a single Write call — the API stream idles during large generations, causing timeout errors. Write the skeleton (frontmatter + headers + first section) first, then use sequential Edit calls to append remaining sections. For plans, articles, and raw notes: write one section per tool call.
 
+10. **Archive is quiet preservation.** Archived topic wikis live under
+`HUB/topics/.archive/<slug>/` and are hidden from normal semantic workflows.
+They remain structurally maintainable through explicit archive/lint operations.
+Deep queries may surface archived index matches separately, but archived content
+must not influence new synthesis unless the user explicitly includes it.
+
 ## Ambient Behavior
 
 When this skill activates outside of an explicit `@wiki` invocation or `/wiki`-style shorthand:
@@ -77,7 +83,7 @@ When this skill activates outside of an explicit `@wiki` invocation or `/wiki`-s
 2. Read the master `_index.md` to assess if the wiki might cover the user's question
 3. If relevant content exists → read the relevant articles and answer with citations
 4. If no relevant content → answer normally, optionally suggest: "This could be added to your wiki; ask `@wiki` to ingest it."
-5. When peeking at sibling wikis, only read their `_index.md` — do not read full articles unless the user asks
+5. When peeking at sibling wikis, only read their `_index.md` — do not read full articles unless the user asks. Skip archived sibling wikis by default; in deep mode, archived index matches may be reported separately.
 
 When giving any boot, resume, or "where you left off" briefing, start with the
 active wiki identity: `<wiki-name> booted from <wiki-root-path>`. Prefer the
@@ -97,6 +103,7 @@ reference material you need for that workflow:
 - `ingest` and `ingest-collection` → `references/ingestion.md`
 - `inventory` → `references/inventory.md`
 - `dataset` → `references/datasets.md`
+- `archive` → `references/archive.md`
 - `compile` → `references/compilation.md` and `references/indexing.md`
 - `query` → read the relevant `_index.md` files first, then only the articles
   needed to answer

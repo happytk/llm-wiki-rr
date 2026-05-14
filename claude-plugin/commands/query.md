@@ -1,6 +1,6 @@
 ---
-description: "Ask questions against the compiled wiki. Supports quick/standard/deep depth levels, --list for browsing, and --resume to reload context after a session break. Answers from wiki content only, with citations."
-argument-hint: "<question> [--quick] [--deep] [--raw] [--list] [--resume] [--tag <tag>] [--category concepts|topics|references] [--with <wiki>...] [--wiki <name>] [--local]"
+description: "Ask questions against the compiled wiki. Supports quick/standard/deep depth levels, --list for browsing, --include-archived for explicit archived reads, and --resume to reload context after a session break. Answers from wiki content only, with citations."
+argument-hint: "<question> [--quick] [--deep] [--raw] [--list] [--include-archived] [--resume] [--tag <tag>] [--category concepts|topics|references] [--with <wiki>...] [--wiki <name>] [--local]"
 allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit
 ---
 
@@ -29,11 +29,30 @@ of scope.
 - **--deep**: Thorough answer — read all related articles, follow all links, search raw, peek sibling wikis
 - **--raw**: Also search raw sources (implied by --deep)
 - **--list**: Return a ranked list of matching articles instead of a synthesized answer. Useful for browsing what the wiki has on a topic before diving in.
+- **--include-archived**: Explicitly allow archived topic wikis or archived
+  supplementary wikis to be read. Label archived citations clearly.
 - **--resume**: Load recent activity context and show a "where you left off" briefing. If a question is also provided, answer it after the briefing using standard depth.
 - **--tag <tag>**: Filter to articles with this tag in frontmatter
 - **--category <cat>**: Search only in concepts, topics, or references
 - **--with <wiki>**: Load a supplementary wiki as additional context when answering. The primary wiki provides the subject; `--with` wikis provide craft/skill knowledge. Multiple `--with` flags allowed.
 - No depth flag = **standard** (default)
+
+### Archive Visibility
+
+Archived topic wikis are preserved under `HUB/topics/.archive/<slug>/` and are
+quiet by default:
+
+- Quick, standard, and list queries exclude archived wikis unless
+  `--include-archived` is present.
+- If the primary `--wiki <name>` target is archived, stop and ask the user to
+  restore it or rerun with `--include-archived`.
+- If a `--with <wiki>` supplementary wiki is archived, reject it unless
+  `--include-archived` is present.
+- Deep queries read archived sibling `_index.md` files only and show an
+  `Archived Matches` section when relevant. Do not read archived articles or
+  cite archived material as evidence unless `--include-archived` is present.
+- When archived content is included, label every archived source/citation with
+  `archived`.
 
 ### Index Freshness Check
 
@@ -84,7 +103,10 @@ Most thorough. For complex questions requiring cross-referencing.
 
 5. **Sibling wiki peek**:
    - Read `HUB/wikis.json`
-   - For each sibling wiki, read its `_index.md`
+   - For each active sibling wiki, read its `_index.md`
+   - For archived sibling wikis, read only the master `_index.md` and only in
+     deep mode. If overlap is found, report it separately as Archived Matches.
+     Do not read archived article bodies unless `--include-archived`.
    - If overlap found, note it with specific article references
 
 6. **Synthesize comprehensive answer**:
@@ -106,6 +128,9 @@ When `--list` is set, return a ranked list of matching articles instead of a syn
    - If `--raw`, also search `raw/`
 
 3. **Tag filter**: If `--tag` specified, use Grep to find files with matching tags in YAML frontmatter: `tags:.*<tag>`.
+
+Archived material stays out of `--list` results unless `--include-archived` is
+present. If included, render archived matches in their own subsection.
 
 4. **Rank results**: Present ordered by relevance:
    - Title match > summary match > body match
@@ -199,6 +224,9 @@ Context reload for new sessions. Reads persistent state and outputs a briefing s
 
 **Related in other wikis:** (if any, or if --deep)
 - [wiki-name]: [Article Title] — appears relevant
+
+**Archived matches:** (deep mode only, or if `--include-archived`)
+- [archived-wiki]: [Article Title] — preserved context, not active evidence
 
 **Knowledge gaps:** (if any)
 - What the wiki doesn't cover that would help answer this better

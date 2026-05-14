@@ -1,6 +1,6 @@
 ---
-description: "Run health checks on the wiki. Find broken links, missing indexes, stale content, inconsistencies, and suggest improvements."
-argument-hint: "[--fix] [--deep] [--wiki <name>] [--local]"
+description: "Run health checks on the wiki. Find broken links, missing indexes, stale content, archive registry drift, inconsistencies, and suggest improvements."
+argument-hint: "[--fix] [--deep] [--include-archived] [--archived-only] [--wiki <name>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebSearch
 ---
 
@@ -18,6 +18,11 @@ Read the linting rules at `skills/wiki-manager/references/linting.md`. Then run 
 
 - **--fix**: Automatically fix issues found (default: report only)
 - **--deep**: Also use WebSearch to fact-check claims and find missing information
+- **--include-archived**: Include archived topic wikis in structural
+  maintenance. Do not create freshness chores unless the user explicitly asks
+  for a full archived maintenance pass.
+- **--archived-only**: Check only archived topic wikis under
+  `HUB/topics/.archive/`.
 
 ### Run Checks
 
@@ -27,6 +32,10 @@ Execute checks from `references/linting.md`. Order matters: C13 (alias rewrite) 
 Verify all required directories and `_index.md` files exist. Treat completely
 absent `inventory/` and `datasets/` layers as unused optional layers, not
 critical structure failures.
+
+At the hub level, allow `topics/.archive/` as the archived-topic container. Do
+not recursively lint archived topic content in a normal lint pass; report the
+count as skipped unless `--include-archived` or `--archived-only` is set.
 
 #### 2. C13: Frontmatter Aliases (Warning, runs early)
 For every `.md` file's frontmatter, rewrite legacy keys and enum values to canonical form using the alias tables in `references/linting.md`. This is how frontmatter schema evolution is handled — there is no migration command. Fix first so subsequent checks see canonical fields.
@@ -116,6 +125,25 @@ Check the dataset registry from `references/datasets.md` and `references/linting
 
 #### 17. C18: Missing Sources (Warning)
 For each `.md` file in `wiki/` (excluding `_index.md`), verify that frontmatter has either a non-empty `sources:` list with at least one resolvable source, or `compiled-from: conversation`. Surface files with neither as missing provenance. Do not auto-fix.
+
+#### 18. C19: Archive Lifecycle and Registry (Warning/Suggestion)
+Check the archive lifecycle from `references/archive.md` and
+`references/linting.md` § C19:
+
+1. At the hub level, inspect `wikis.json` and `HUB/topics/.archive/`.
+2. Report archived topics skipped by default.
+3. If `--include-archived` is present, run structural checks against archived
+   topic wikis in addition to active topics, but skip freshness/coverage pressure
+   unless the user explicitly asks for a full archived maintenance pass.
+4. If `--archived-only` is present, only check archived topic wikis.
+5. Validate registry lifecycle state:
+   - archived paths use `status: archived`
+   - archived entries point to existing `topics/.archive/<slug>` roots
+   - active entries do not point into `.archive`
+   - filesystem-only archived topics are registry repair candidates
+   - active/archive slug collisions are warnings and never auto-fixed
+6. Surface active content that depends on archived paths as boundary-crossing
+   provenance warnings.
 
 ### If --fix
 

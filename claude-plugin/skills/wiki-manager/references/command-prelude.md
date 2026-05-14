@@ -21,7 +21,7 @@ Every command that needs a wiki follows these steps in order:
 
 2. **Resolve wiki location.** The target wiki is determined by this order (first match wins):
    1. `--local` flag → `.wiki/` in the current directory
-   2. `--wiki <name>` flag → look up in `HUB/wikis.json`, resolving `<HUB>`, `~`, absolute, and HUB-relative paths; if a registry path is stale, fall back to `HUB/topics/<name>`
+   2. `--wiki <name>` flag → look up in `HUB/wikis.json`, resolving `<HUB>`, `~`, absolute, and HUB-relative paths; if a registry path is stale, fall back to `HUB/topics/<name>`. If the registry entry has `status: archived` or resolves under `topics/.archive/`, commands that read/write semantic content should reject it unless they explicitly support archived inclusion.
    3. Current directory contains a `.wiki/` → use it
    4. Otherwise → HUB (use the hub's active topic wiki, or fail per the command's wiki-requirement variant below)
 
@@ -52,6 +52,21 @@ The rationale is ergonomics — research and ingestion are often the first opera
 ### Variant C: wiki-neutral (project, output without articles, status)
 
 These commands either don't require wiki content (project manifest operations, wiki status) or have their own "no articles yet" message. They resolve HUB and wiki location, then handle missing state inline with command-specific messaging.
+
+### Variant D: hub lifecycle (archive)
+
+Archive resolves HUB, not an active topic wiki. It mutates topic lifecycle by
+moving topic roots between `HUB/topics/<slug>/` and
+`HUB/topics/.archive/<slug>/`, then updating `wikis.json`. It does not operate
+on project-local `.wiki/` directories in v1.
+
+## Archive visibility
+
+Archived topic wikis are quiet by default. Normal query, compile, ingest,
+research, output, plan, assess, librarian, refresh, and broad audit workflows
+skip registry entries with `status: archived` or paths under `topics/.archive/`.
+Deep query may report archived index matches separately, but full archived reads
+require explicit user intent such as `--include-archived`.
 
 ## Project scoping
 

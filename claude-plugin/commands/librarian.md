@@ -1,6 +1,6 @@
 ---
-description: "Keep the wiki article layer in check: staleness, quality, accuracy, and coherence. Focused maintenance tool; broader trust audits belong to /wiki:audit."
-argument-hint: "scan [--article <path>] [--resume] [--passes <list>] | report | fix <id> [--wiki <name|all>] [--local]"
+description: "Keep the active wiki article layer in check: staleness, quality, accuracy, and coherence. Focused maintenance tool; broader trust audits belong to /wiki:audit."
+argument-hint: "scan [--article <path>] [--resume] [--passes <list>] [--include-archived] | report | fix <id> [--wiki <name|all>] [--local]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebFetch, WebSearch, Agent
 ---
 
@@ -38,6 +38,13 @@ Flags (apply to `scan`):
 - **--passes <list>**: Comma-separated list of passes to run. Default: `staleness,quality`. Future: `verification,coherence,dedup`.
 - **--wiki <name|all>**: Target a specific topic wiki, or every registered topic wiki sequentially.
 - **--local**: Use project-local `.wiki/`.
+- **--include-archived**: Explicitly include archived topic wikis. Archived
+  topics are skipped by default so stale old interests do not create
+  maintenance chores.
+
+When `--wiki all` is used, iterate active registered topic wikis only unless
+`--include-archived` is present. If a single `--wiki <name>` target is archived,
+ask for `--include-archived` or restoration before scanning.
 
 ### Scan Protocol
 

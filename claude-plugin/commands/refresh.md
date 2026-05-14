@@ -1,6 +1,6 @@
 ---
-description: "Check if wiki articles are still current. Re-fetches sources, detects changes, and offers to update stale articles."
-argument-hint: "[<article-path>|--due] [--wiki <name|all>] [--local]"
+description: "Check if active wiki articles are still current. Re-fetches sources, detects changes, and offers to update stale articles."
+argument-hint: "[<article-path>|--due] [--wiki <name|all>] [--local] [--include-archived]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), WebFetch, WebSearch, Agent
 ---
 
@@ -24,7 +24,13 @@ inventory for durable watch items and blocked actions.
 
 - **article-path**: Path to a specific wiki article to refresh (e.g., `wiki/concepts/nvidia-spark.md`)
 - **--due**: Check ALL articles past their volatility tier's staleness threshold. Present a numbered list for the user to select which ones to refresh.
+- **--include-archived**: Explicitly include archived topic wikis. Archived
+  topics are skipped by default so old interests do not create freshness chores.
 - If neither is provided, show articles sorted by staleness (most overdue first) and ask which to check.
+
+When `--wiki all` is used, iterate active registered topic wikis only unless
+`--include-archived` is present. If a single `--wiki <name>` target is archived,
+ask for `--include-archived` or restoration before refreshing.
 
 ### Refresh Protocol
 

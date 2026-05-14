@@ -1,6 +1,6 @@
 ---
-description: "Assess a local repo against the wiki's research body and the broader market. Gap analysis, opportunities, competitive landscape."
-argument-hint: "<repo-path> [--wiki <name>] [--local] [--retardmax]"
+description: "Assess a local repo against the active wiki's research body and the broader market. Gap analysis, opportunities, competitive landscape."
+argument-hint: "<repo-path> [--wiki <name>] [--local] [--retardmax] [--include-archived]"
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(find:*), Bash(head:*), WebFetch, WebSearch, Agent
 ---
 
@@ -34,6 +34,12 @@ Unlike other commands, `assess` does NOT default to HUB when no wiki is specifie
 - **--wiki <name>**: Which topic wiki to compare against
 - **--retardmax**: Skip planning, scan everything, cast wide net on web search
 - **--local**: Use project-local wiki
+- **--include-archived**: Explicitly allow archived wiki context. Label
+  archived-derived evidence in the report.
+
+Archived topic wikis are excluded by default, including in `--retardmax`. If
+the selected `--wiki` is archived, stop and ask the user to restore it or rerun
+with `--include-archived`.
 
 ### Compare Protocol
 

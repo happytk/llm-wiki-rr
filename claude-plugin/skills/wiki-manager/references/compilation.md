@@ -9,6 +9,11 @@ ingested or what should happen next, but article facts must come from `raw/` and
 other cited wiki articles. If compilation satisfies an inventory next action,
 report the suggested record update instead of silently changing tracking state.
 
+Archived topic wikis are not compilation inputs by default. If the target wiki
+is archived, ask the user to restore it or explicitly include archived content.
+Compiling an archived target must keep all writes inside that archived topic and
+must not use archived sources to update active articles.
+
 ## Incremental vs Full
 
 - **Incremental** (default): Only process sources ingested since the last compilation date (from master `_index.md`). Compare source `ingested` dates against `Last compiled` in master index.

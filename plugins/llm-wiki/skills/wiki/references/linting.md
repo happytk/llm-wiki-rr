@@ -20,6 +20,11 @@ There are two layers where this principle applies, each with its own rules:
   something to auto-populate with empty placeholders. Partially existing
   registry structure is repairable. Converting outputs or raw data into dataset
   manifests is human-gated.
+- **Archive lifecycle (C19)** — topic wiki lifecycle under
+  `HUB/topics/.archive/`. Archive is quiet preservation: normal lint reports
+  archived topics as skipped, while `--include-archived` or `--archived-only`
+  can structurally maintain them without creating freshness or compilation
+  chores.
 
 Concretely, when evolving the schema:
 
@@ -27,14 +32,14 @@ Concretely, when evolving the schema:
 - **Renamed a frontmatter field?** Append an entry to C13's alias table (old → new). Never remove old aliases.
 - **Changed an enum value?** Add a value alias in C13. Never remove old values.
 - **Added a required field?** Add it to C2 and give it an inference rule (derive from body/filename) or a sane default.
-- **New directory under `raw/`, `wiki/`, `inventory/`, or `datasets/`?** Add it to C12's allowlist and C11/C16/C17's placement map.
+- **New directory under `raw/`, `wiki/`, `inventory/`, `datasets/`, or hub topic lifecycle paths?** Add it to C12/C19's allowlists and C11/C16/C17/C19's placement maps.
 - **New project-level structure or manifest rule?** Update C8 (and projects.md). Candidate heuristics go in C9.
 
 There is no `/wiki:migrate` command and there should never be one. Lint rules **are** the schema.
 
 **When editing the canonical spec** (`wiki-structure.md`, `compilation.md`, `ingestion.md`, `projects.md`, or any reference that defines paths or frontmatter fields), also:
 
-1. Update the relevant check(s) in this file — mechanical changes touch C11/C12/C13; project-model changes touch C8/C9.
+1. Update the relevant check(s) in this file — mechanical changes touch C11/C12/C13; project-model changes touch C8/C9; topic lifecycle changes touch C19.
 2. Verify `commands/lint.md` still runs the placement/alias pass in the correct order.
 3. Verify `commands/compile.md` still runs the placement pre-check on `raw/` as step 0.
 
@@ -53,6 +58,9 @@ There is no `/wiki:migrate` command and there should never be one. Lint rules **
 - [ ] Every existing wiki-managed subdirectory under `raw/`, `wiki/`, `inventory/`, and `datasets/` has `_index.md` where applicable. Optional lazy roots that are completely absent are not C1 failures.
 - [ ] `output/` has `_index.md`
 - [ ] Every `.md` file (excluding `_index.md` and `config.md`) has valid YAML frontmatter delimited by `---`
+- [ ] Hub `topics/.archive/`, when present, contains only archived topic
+  directories. Archived topic roots still have their own `_index.md`, but
+  normal topic lint skips them unless explicitly included.
 
 ### C2: Frontmatter (Critical/Warning)
 
@@ -213,6 +221,8 @@ Any file that is not in the canonical allowlist for its location is either a use
 | Location | Allowed items |
 |----------|--------------|
 | HUB | `wikis.json`, `_index.md`, `log.md`, `topics/` |
+| `HUB/topics/` | active topic directories plus `.archive/` |
+| `HUB/topics/.archive/` | archived topic directories |
 | Topic wiki root | `_index.md`, `config.md`, `log.md`, `raw/`, `wiki/`, `inventory/`, `datasets/`, `output/`, `inbox/`, `.obsidian/`, `.librarian/`, `.audit/`, `.research-session.json`, `.thesis-session.json`, `.session-events.jsonl`, `.session-checkpoint.json` |
 | `raw/` | `_index.md`, `articles/`, `papers/`, `repos/`, `notes/`, `data/` |
 | `wiki/` | `_index.md`, `concepts/`, `topics/`, `references/`, `theses/` |
@@ -402,6 +412,46 @@ The exemption is `compiled-from: conversation` — articles whose evidence is th
 
 **Output line**: `Compiled article missing sources: <path>. (C18)`
 
+### C19: Archive Lifecycle and Registry (Warning/Suggestion)
+
+Validates the hub-level archive lifecycle described in `archive.md`.
+
+- [ ] `HUB/topics/.archive/` may exist and is not an unknown directory.
+- [ ] Archived topic directories have `_index.md`, `config.md`, `log.md`, and
+  normal topic wiki structure when checked with `--include-archived` or
+  `--archived-only`.
+- [ ] `wikis.json` entries whose path starts `topics/.archive/` have
+  `status: archived`.
+- [ ] `wikis.json` entries with `status: archived` point to an existing
+  `topics/.archive/<slug>` directory, or lint reports the stale registry entry.
+- [ ] Active registry entries do not point into `topics/.archive/`.
+- [ ] If `HUB/topics/.archive/<slug>/_index.md` exists but the registry is
+  missing the topic, report a registry repair candidate.
+- [ ] If both `HUB/topics/<slug>` and `HUB/topics/.archive/<slug>` exist,
+  report a lifecycle collision and never choose automatically.
+- [ ] Active articles or outputs that cite archived raw/wiki/output paths are
+  surfaced as boundary-crossing provenance warnings. This is allowed but should
+  be visible.
+
+**Default behavior**:
+
+- Normal hub lint reports `Archived topics: N skipped` and does not recursively
+  inspect archived topic content.
+- Normal topic lint has no archive behavior unless the target topic path itself
+  is archived, in which case the command should ask for `--include-archived` or
+  `--archived-only`.
+
+**Auto-fix**:
+
+- With `--fix`, repair unambiguous registry drift:
+  - archived directory exists, registry path stale/missing -> set
+    `path: topics/.archive/<slug>` and `status: archived`
+  - active directory exists, archived directory absent, registry says archived
+    -> set `path: topics/<slug>` and `status: active`
+- Do not move a topic into or out of archive during lint. Archive and restore
+  are explicit lifecycle operations.
+- Do not auto-resolve active/archive collisions.
+
 ## Auto-Fix Rules (when --fix is set)
 
 | Issue | Auto-Fix Action |
@@ -437,6 +487,8 @@ The exemption is `compiled-from: conversation` — articles whose evidence is th
 | **C17** Missing dataset registry directories/indexes | Repair missing indexes for existing dataset directories; do not create a completely absent dataset tree or empty unused sample/profile/query folders |
 | **C17** Output looks like a dataset manifest | Warn only — suggest `/wiki:dataset migrate-output <path> --dry-run`; never auto-migrate |
 | **C18** Compiled article missing sources | **Warn only** — surface with the suggested commands. Do not auto-add `compiled-from: conversation` (that's a provenance claim that requires human judgment) and do not auto-recompile (would synthesize fake sources). |
+| **C19** Archived topic registry drift | Repair only unambiguous `wikis.json` path/status drift. Do not move topic directories during lint |
+| **C19** Active/archive topic collision | Warn only — user must decide which directory wins |
 
 ## Report Format
 
@@ -491,4 +543,10 @@ The exemption is `compiled-from: conversation` — articles whose evidence is th
 - Legacy frontmatter keys updated: [count by alias]
 - Legacy enum values updated: [count by alias]
 - Unknown directories (not auto-deleted): [list]
+
+### Archive
+- Archived topics skipped by default: [count]
+- Archived topics checked: [count, only when explicitly included]
+- Registry lifecycle repairs: [list]
+- Active/archive collisions: [list]
 ```
