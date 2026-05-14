@@ -19,6 +19,8 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, th
 
 ## Changelog
 
+**v0.8.7** — **iCloud permission diagnostics.** When macOS lets Codex stat an iCloud hub path but denies actual reads or directory listings, the local CLI now reports the real privacy-permission problem instead of calling the registry invalid or suggesting a machine-local fallback path.
+
 **v0.8.6** — **Lint repair correctness.** `lint --fix` now repairs legacy article frontmatter, rewrites fuzzy raw source refs to exact paths when resolution is unambiguous, regenerates stale directory indexes, ignores maintenance backup indexes under `.librarian/`, and creates an explicit uncompiled-source coverage reference instead of leaving raw coverage gaps as endless suggestions.
 
 **v0.8.5** — **Safer lint defaults.** Hub-level lint now stays scoped to the shared registry instead of recursively auditing every topic by accident, and `lint --fix` preserves absent lazy `inventory/` and `datasets/` layers unless those layers already exist or the current workflow needs them.
@@ -28,8 +30,6 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, th
 **v0.8.0** — **Inventory tracking and dataset manifests.** Added first-class `/wiki:inventory` for durable items, candidates, entities, corpora, saved views, and opinionated migration previews, plus `/wiki:dataset` manifests for large or external datasets that should be indexed by the wiki without being copied into it. Lint, query, ingest, research, audit, plan, and output workflows now know how to surface inventory and dataset state while keeping raw evidence, compiled knowledge, and generated artifacts separate.
 
 **v0.7.0** — **PDF, message archive, and Wayback adapters.** PDF ingest now prefers real markdown extraction over metadata stubs, with `pdftotext` plus Python-library fallback guidance. Collection ingestion now covers CSV/TSV/JSON/JSONL message archives as per-message markdown sources and Internet Archive CDX inventories as readability-to-markdown Wayback snapshot imports.
-
-**v0.6.0** — **Collection ingestion for external wikis and spec repos.** Added first-class `/wiki:ingest-collection` for bounded upstream corpora such as Git document repositories, BIP-style proposal sets, MediaWiki XML dumps, and MediaWiki API sites. Collection imports now create a `raw/repos/` manifest plus immutable child sources with upstream revision metadata, while compilation stays synthesized instead of copying another wiki wholesale. The router now detects bulk import intent, and lint/schema docs recognize collection provenance fields and manifest coverage exemptions.
 
 ## Install
 
@@ -234,7 +234,13 @@ If you prefer `~/wiki` as a symlink to iCloud, nono's Seatbelt follows symlinks 
 
 ### Diagnosing access issues
 
-Without the right permissions, Seatbelt silently blocks file access — reads return empty, writes disappear, and the plugin looks broken with no error messages. Use `nono why` to diagnose:
+Without the right permissions, Seatbelt or macOS privacy controls can block file
+access. A useful diagnostic pattern is: `stat` succeeds for the iCloud wiki path,
+but reading `wikis.json` or listing `topics/` fails with `Operation not
+permitted`. That means the configured `hub_path` is correct; grant Full Disk
+Access or iCloud Drive access to the exact app launching the agent, restart it,
+and do not switch to a machine-local `resolved_path` or `~/wiki` fallback. Use
+`nono why` to diagnose sandbox rules:
 
 ```bash
 nono why --path ~/.config/llm-wiki --op read

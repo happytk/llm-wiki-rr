@@ -23,7 +23,11 @@ Defaults to `~/wiki/`. Optionally configured via `~/.config/llm-wiki/config.json
 If the config exists, prefer `hub_path` (expand only the leading `~`) instead of
 `~/wiki/` everywhere below. Treat `resolved_path` from older configs as a
 machine-specific fallback cache, not as the source of truth; do not write it
-into shared configs. Store the selected path as **HUB**. Use
+into shared configs. If the path can be statted but reading `wikis.json` or
+listing `topics/` fails with `Operation not permitted`, the path is correct and
+macOS/iCloud privacy is blocking the launcher; ask the user to grant Full Disk
+Access or iCloud Drive access and restart, rather than falling back to another
+machine path. Store the selected path as **HUB**. Use
 `/wiki config hub-path <path>` to set it up, or create the JSON manually.
 
 ### Hub (~/wiki/)

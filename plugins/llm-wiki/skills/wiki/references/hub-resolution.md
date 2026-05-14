@@ -51,6 +51,8 @@ Most sessions hit steps 1-3 and resolve from config. The `~/wiki/` fallback is o
 
 > **Do not write `resolved_path` into shared configs.** Older configs may contain it, but new config writes should keep only `hub_path` unless the user explicitly wants a machine-local absolute config. This prevents one Mac's `/Users/<name>/...` path from breaking another Mac.
 
+> **Permission-denied is not path-missing.** On macOS/iCloud, `stat` can succeed for `HUB`, `HUB/wikis.json`, and `HUB/topics`, while actual reads or directory listings fail with `Operation not permitted` (`errno=1`). In that case the configured `hub_path` is correct. Stop and tell the user to grant Full Disk Access or iCloud Drive access to the exact app launching the agent, then restart the agent. Do not fall back to `~/wiki`, do not use `resolved_path`, and do not suggest moving the wiki just because reads are denied.
+
 ## Optional setup: symlink
 
 For users who want the convenience of `~/wiki/` without granting sandbox access to their real wiki path, a symlink works:

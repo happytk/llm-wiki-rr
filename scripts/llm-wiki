@@ -50,6 +50,7 @@ DATASET_STORAGE = {"local", "remote", "external", "hybrid"}
 SCHEMA_STATUSES = {"unknown", "inferred", "declared", "validated"}
 CONFIDENCE_VALUES = {"high", "medium", "low"}
 VOLATILITY_VALUES = {"hot", "warm", "cold"}
+PERMISSION_DENIED_ERRNOS = {1, 13}
 
 ROOT_ALLOWED = {
     "_index.md",
@@ -343,6 +344,23 @@ def write_markdown_frontmatter(path: Path, frontmatter: str, body: str) -> None:
     path.write_text("---\n" + frontmatter.rstrip() + "\n---" + body, encoding="utf-8")
 
 
+def is_permission_denied(exc: BaseException) -> bool:
+    return isinstance(exc, PermissionError) or getattr(exc, "errno", None) in PERMISSION_DENIED_ERRNOS
+
+
+def permission_denied_message(path: Path | None, operation: str, exc: BaseException) -> str:
+    target = str(path or getattr(exc, "filename", None) or "wiki path")
+    return (
+        f"permission denied while trying to {operation}: {target}\n"
+        f"{type(exc).__name__}: {exc}\n\n"
+        "The path exists, but this process cannot read or list its contents. "
+        "On macOS this usually means the app launching Codex/the terminal lacks "
+        "Full Disk Access or iCloud Drive access. Grant access to the exact launcher, "
+        "restart Codex, and try again. The configured hub_path is probably correct; "
+        "do not switch to a ~/wiki fallback or machine-local resolved_path for this error."
+    )
+
+
 def read_document(ctx: LintContext, path: Path) -> Document | None:
     try:
         text = path.read_text(encoding="utf-8")
@@ -350,6 +368,9 @@ def read_document(ctx: LintContext, path: Path) -> Document | None:
         ctx.issue("critical", "Markdown file is not valid UTF-8.", path)
         return None
     except OSError as exc:
+        if is_permission_denied(exc):
+            ctx.issue("critical", permission_denied_message(path, "read file", exc), path)
+            return None
         ctx.issue("critical", f"Could not read file: {exc}", path)
         return None
 
@@ -366,9 +387,14 @@ def read_document(ctx: LintContext, path: Path) -> Document | None:
 
 
 def markdown_files(root: Path) -> list[Path]:
-    if not root.exists():
-        return []
-    return sorted(path for path in root.rglob("*.md") if path.is_file())
+    try:
+        if not root.exists():
+            return []
+        return sorted(path for path in root.rglob("*.md") if path.is_file())
+    except OSError as exc:
+        if is_permission_denied(exc):
+            raise SystemExit(permission_denied_message(root, "list markdown files under", exc)) from exc
+        raise
 
 
 def content_markdown_files(root: Path) -> list[Path]:
@@ -1317,6 +1343,10 @@ def resolve_hub(args: argparse.Namespace) -> Path:
     if config.exists():
         try:
             data = json.loads(config.read_text(encoding="utf-8"))
+        except OSError as exc:
+            if is_permission_denied(exc):
+                raise SystemExit(permission_denied_message(config, "read hub config", exc)) from exc
+            raise SystemExit(f"could not read hub config {config}: {exc}") from exc
         except json.JSONDecodeError as exc:
             raise SystemExit(f"invalid hub config {config}: {exc}") from exc
         hub_path = data.get("hub_path")
@@ -1370,7 +1400,13 @@ def resolve_wiki_root(args: argparse.Namespace) -> Path:
             raise SystemExit(f"wiki registry not found: {registry}")
         try:
             data = json.loads(registry.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        except OSError as exc:
+            if is_permission_denied(exc):
+                raise SystemExit(permission_denied_message(registry, "read wiki registry", exc)) from exc
+            if initialized_wiki_root(fallback_topic):
+                return fallback_topic
+            raise SystemExit(f"could not read wiki registry {registry}: {exc}") from exc
+        except json.JSONDecodeError as exc:
             if initialized_wiki_root(fallback_topic):
                 return fallback_topic
             raise SystemExit(f"invalid wiki registry {registry}: {exc}") from exc
@@ -1516,6 +1552,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args))
+    except PermissionError as exc:
+        print(permission_denied_message(None, "access wiki files", exc), file=sys.stderr)
+        return 2
     except BrokenPipeError:
         return 1
 

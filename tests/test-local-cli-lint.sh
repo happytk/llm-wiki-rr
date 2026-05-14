@@ -363,6 +363,26 @@ expect_success \
   "topic directory fallback works when wikis.json is unreadable" \
   "$CLI" lint --hub "$bad_registry_hub" --wiki bad-registry-topic
 
+permission_hub="$tmpdir/permission-hub"
+mkdir -p "$permission_hub/topics/denied-topic"
+cp -R "$GOLDEN/." "$permission_hub/topics/denied-topic/"
+cat > "$permission_hub/wikis.json" <<'JSON'
+{
+  "default": "<HUB>",
+  "wikis": {
+    "hub": { "path": "<HUB>", "description": "Hub" },
+    "denied-topic": { "path": "topics/denied-topic", "description": "Denied topic" }
+  },
+  "local_wikis": []
+}
+JSON
+chmod 000 "$permission_hub/wikis.json"
+expect_failure_contains \
+  "permission-denied registry read gives actionable diagnostic" \
+  "Full Disk Access" \
+  "$CLI" lint --hub "$permission_hub" --wiki denied-topic
+chmod 644 "$permission_hub/wikis.json"
+
 echo ""
 echo "==========================================="
 printf "Results: \033[32m%d passed\033[0m, \033[31m%d failed\033[0m, %d total\n" "$PASS" "$FAIL" "$TOTAL"
