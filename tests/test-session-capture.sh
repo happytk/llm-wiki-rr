@@ -91,6 +91,24 @@ else
   log_fail "Codex bundled hook command handles PLUGIN_ROOT paths with spaces" "$manifest_hook_cmd"
 fi
 
+claude_payload1=$(printf '{"session_id":"claude-session","hook_event_name":"PostToolUse","cwd":"%s","permission_mode":"default","transcript_path":"%s/transcript.jsonl","tool_name":"Bash","prompt":"do not store this Claude prompt","tool_response":"do not store this Claude tool response","tool_input":{"password":"super-secret-password"}}' "$PWD" "$tmpdir")
+claude_payload2=$(printf '{"session_id":"claude-session","hook_event_name":"PostToolUse","cwd":"%s","permission_mode":"default","transcript_path":"%s/transcript.jsonl","tool_name":"Read"}' "$PWD" "$tmpdir")
+printf '%s' "$claude_payload1" | "$SESSION" --hub "$hub" hook --if-enabled
+printf '%s' "$claude_payload2" | "$SESSION" --hub "$hub" hook --if-enabled
+claude_digest="$hub/.sessions/digests/$(date +%Y)/$(date +%m)/claude-claude-session.md"
+if [ -f "$claude_digest" ] \
+  && grep -q 'harness: "claude"' "$claude_digest" \
+  && grep -q 'llm_wiki_session_id: "claude:claude-session"' "$claude_digest"; then
+  log_pass "Claude-like hook payload auto-detects harness and writes digest"
+else
+  log_fail "Claude-like hook payload auto-detects harness and writes digest" "$claude_digest"
+fi
+if ! grep -R 'super-secret-password\|do not store this Claude prompt\|do not store this Claude tool response' "$hub/.sessions" >/dev/null; then
+  log_pass "Claude-like hook payload redacts secrets and omits content fields"
+else
+  log_fail "Claude-like hook payload redacts secrets and omits content fields" "sensitive Claude payload data found under .sessions"
+fi
+
 payload1=$(printf '{"session_id":"test-session","hook_event_name":"PostToolUse","cwd":"%s","prompt":"do not store this raw prompt text","tool_name":"Bash","tool_input":{"api_key":"sk-12345678901234567890","command":"curl -H Authorization: Bearer abcdefghijklmnop"}}' "$PWD")
 payload2=$(printf '{"session_id":"test-session","hook_event_name":"PostToolUse","cwd":"%s","tool_name":"Bash"}' "$PWD")
 printf '%s' "$payload1" | "$SESSION" --hub "$hub" hook --harness codex --if-enabled
