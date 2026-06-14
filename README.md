@@ -19,7 +19,15 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, co
 
 ## Changelog
 
-**v0.11.0** — **Automated session capture.** Added a default-on `session` workflow and deterministic `llm-wiki-session` helper that writes redacted hook events, state JSON, and markdown digests under `HUB/.sessions/`; users can opt out with `session disable`, and promotion into topic wikis remains explicit.
+**v0.11.1** — **Session helper compatibility.** Small hotfix so automated session capture works on Python 3.9/macOS system Python as well as newer Python runtimes.
+
+**v0.11.0** — **Automated session capture.**
+- Default-on redacted session checkpoints under `HUB/.sessions/`.
+- New `@wiki session status|disable|enable|capture|list|show|rehydrate|promote` workflow.
+- `session disable` opt-out writes `enabled: false`, making trusted hooks no-op.
+- Compact context rehydration for future turns/sessions.
+- Captured digests stay operational until explicitly promoted into topic `raw/notes/`.
+- Codex hook bundle plus tested Claude-shaped hook payload handling.
 
 **v0.10.2** — **Collector production hardening.** Collection-family topic slugs now prefer kind-first names such as `memes-bitcoin`, the scale boundary treats 500 rows as large and 501+ as huge, and media downloads call out timeouts, file-size caps, content-type checks, and IPv4 retry for hosts that hang.
 
