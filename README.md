@@ -19,7 +19,12 @@ LLM-compiled knowledge bases for any AI agent. Parallel multi-agent research, co
 
 ## Changelog
 
-**v0.12.0** — **Feedback curator.** Added redacted feedback candidates under `HUB/.sessions/feedback/` for high-signal user corrections, preferences, approvals, and plan acceptance; generic acknowledgements are ignored, and selected candidates can be reviewed with `@wiki feedback list/show` and explicitly promoted with `@wiki feedback promote`.
+**v0.12.0** — **Feedback curator.**
+- Captures high-signal user corrections, preferences, approvals, and plan acceptance as redacted candidates under `HUB/.sessions/feedback/`.
+- Ignores generic acknowledgements like `ok`, `thanks`, and `cool`.
+- Adds `@wiki feedback list|show|capture|promote` for review, manual capture, and promotion.
+- Promotes selected candidates explicitly into topic `raw/notes/`; nothing is auto-promoted.
+- Includes recent feedback candidates in session digests for review during rehydration and lessons-learned workflows.
 
 **v0.11.1** — **Session helper compatibility.** Small hotfix so automated session capture works on Python 3.9/macOS system Python as well as newer Python runtimes.
 
