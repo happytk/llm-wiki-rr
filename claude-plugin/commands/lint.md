@@ -1,7 +1,7 @@
 ---
 description: "Run health checks on the wiki. Find broken links, missing indexes, stale content, archive registry drift, inconsistencies, and suggest improvements."
 argument-hint: "[--fix] [--deep] [--include-archived] [--archived-only] [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebSearch
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebSearch, mcp__roam-direct
 ---
 
 ## Your task
@@ -11,6 +11,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found. Run `/wiki init` first."
+5. **Resolve the backend.** Check the resolved wiki's `wikis.json` entry for `backend: "roam"` (else the global `wiki_backend` in `config.json`, else `files`). If **roam**, read `skills/wiki-manager/references/roam-backend.md`: run the `wiki/`-layer checks (C2, C4, C4b, C6, C14, C15, C18) as Datalog queries over the graph and skip the directory/index checks (C1/C3/C11 have no filesystem target); cross-boundary checks (C4b source provenance, C6 coverage) resolve `raw-source::` paths against `raw/` on disk; auto-fixes use `roam_apply_page_ops` (preserves uids). Checks on `raw/`, `inventory/`, `datasets/`, and `output/` run on disk unchanged. The default **files** backend behaves exactly as below.
 
 Read the linting rules at `skills/wiki-manager/references/linting.md`. Then run health checks on the wiki.
 

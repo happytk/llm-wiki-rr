@@ -35,6 +35,15 @@ The config file looks like:
 
 If no config exists and `~/wiki/` has `_index.md`, that works too. But config is checked first — in sandboxed environments `~/wiki/` may not be accessible. All references to `~/wiki/` below mean HUB.
 
+## Wiki Backend
+
+The compiled `wiki/` layer has two backends. The **`raw/` evidence layer and all operational layers always stay on disk** regardless.
+
+- **`files`** (default) — articles are markdown files under `wiki/` with derived `_index.md` caches. This is the behavior every other reference assumes.
+- **`roam`** — articles live as pages in a self-hosted Roam graph (one graph per topic wiki), written/read through the roamresearch-local MCP server using its batch tools (`roam_replace_page`, `roam_apply_page_ops`, `roam_create_block` with `children`, `roam_datomic_query`).
+
+Resolve the backend right after the wiki: a `wikis.json` topic entry's `backend: "roam"` (with `roam_graph`/`roam_server`) wins; else the global `wiki_backend` in `config.json`; else `files`. When the backend is `roam`, read [references/roam-backend.md](references/roam-backend.md) — it defines the article↔page mapping, frontmatter→attribute conventions, source tracking across the raw↔wiki boundary, and per-command (compile/query/lint) behavior. `ingest` and the other disk-only commands are unaffected.
+
 ## Wiki Location
 
 **Topic sub-wikis are the default.** HUB is a hub — content lives in `HUB/topics/<name>/`. Each topic gets isolated indexes, sources, and articles. This keeps queries focused and prevents unrelated topics from polluting each other's search space.

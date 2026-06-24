@@ -1,7 +1,7 @@
 ---
 description: "Compile raw sources into wiki articles. Synthesizes, cross-references, and organizes active knowledge."
 argument-hint: "[--full] [--source <path>] [--topic <name>] [--include-archived] [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), mcp__roam-direct
 ---
 
 ## Your task
@@ -11,6 +11,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found. Run `/wiki init` first."
+5. **Resolve the backend.** Check the resolved wiki's `wikis.json` entry for `backend: "roam"` (else the global `wiki_backend` in `config.json`, else `files`). If **roam**, read `skills/wiki-manager/references/roam-backend.md` and write the `wiki/` layer to the Roam graph via its MCP batch tools instead of to files; `raw/` and all other layers stay on disk. The default **files** backend behaves exactly as below.
 
 Read the compilation protocol at `skills/wiki-manager/references/compilation.md` and the indexing protocol at `skills/wiki-manager/references/indexing.md`. Then compile raw sources into wiki articles.
 
@@ -37,6 +38,8 @@ raw sources to update active articles.
   makes the wiki active.
 
 ### Compilation Process
+
+> **Roam backend:** follow `references/roam-backend.md` for steps 4–8. In short: determine already-compiled sources with a `roam_datomic_query` over `raw-source::` (not a `wiki/_index.md` read); skip the placement pre-check (step 0) and bidirectional-link step (step 6 — Roam backlinks are automatic); write each article as one nested `children` tree via `roam_replace_page` (one transaction per article, never block-by-block); cross-link with `[[Title]]` page links, never `((uid))`; and in step 7 update only the on-disk master `_index.md` stats (there is no `wiki/_index.md`). Everything else (survey of `raw/`, reading sources, logging) is unchanged.
 
 0. **Placement pre-check** (C13 + C11 from `references/linting.md`): Before surveying, walk `raw/` and for each `.md` file read its frontmatter. Rewrite any legacy keys/values using the C13 alias table. Then compare the file's `type` field to its actual directory — if it's misplaced (e.g., `type: papers` but sitting in `raw/notes/`, or loose at the wiki root), `mv` it to the canonical path, creating the destination directory if needed. This is the same rule lint uses, run inline because you're already reading every frontmatter. It heals both user miscategorization and stale layouts from older wiki versions — there is no separate migration pass. On slug collisions at the destination, skip and warn. Do this before step 1 so the survey sees canonical state. Does not touch `output/projects/` — that's compile step 7's territory.
 
