@@ -97,6 +97,34 @@ All content lives here. One topic per wiki. Isolated indexes, focused queries.
 
 Same structure as a topic wiki but at `<project>/.wiki/`. Add `.wiki/` to `.gitignore`.
 
+### Wiki Backend (compiled `wiki/` layer)
+
+The compiled `wiki/` layer has two backends. The `raw/` evidence layer and all
+operational layers (`inventory/`, `datasets/`, `output/`, logs, sessions) always
+stay on disk.
+
+- **`files`** (default) — articles are markdown files under `wiki/` with derived
+  `_index.md` caches. Everything below assumes this unless stated.
+- **`roam`** — articles live as pages in a self-hosted Roam graph (one graph per
+  topic wiki), written/read through a Roam MCP server (e.g. `roam-direct`) using
+  batch tools (`roam_replace_page`, `roam_apply_page_ops`, `roam_create_block`
+  with a nested `children` tree, `roam_create_table`) and `roam_datomic_query`
+  for reads.
+
+Resolve the backend right after the wiki: a `wikis.json` topic entry's
+`backend: "roam"` (with `roam_graph`/`roam_server`) wins; else a global
+`wiki_backend` in `config.json`; else `files`. On the roam backend, map an
+article to one page: frontmatter → Roam `attribute::` (`category::`,
+`confidence::`, `volatility::`, `verified::`, `tags::`, `raw-source::`), body →
+nested blocks, cross-links → `[[Title]]` page links (backlinks replace
+bidirectional See-Also bookkeeping; never `((uid))` cross-article refs — they
+break `roam_replace_page`), and write the whole article in **one transaction**
+rather than block-by-block. Source provenance crosses the raw↔wiki boundary via
+the `raw-source::` attribute holding hub-relative paths into the on-disk `raw/`
+layer. `ingest` and the disk-only operations are unaffected; `compile`, `query`,
+`lint`, `audit`, `librarian`, and `output` branch to the graph for the `wiki/`
+layer.
+
 ## Core Principles
 
 1. **One topic, one wiki.** Never mix unrelated topics. The hub is just a registry.

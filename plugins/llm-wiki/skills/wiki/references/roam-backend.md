@@ -165,6 +165,17 @@ Structural checks shift from filesystem walks to graph queries; cross-boundary c
 
 ---
 
+## Other commands
+
+These follow the same backend-resolution step; only their `wiki/`-layer touchpoints change.
+
+- **librarian** — the article-quality scan (staleness, low confidence, weak connections) runs against the graph: `roam_datomic_query`/`roam_fetch_page_by_title` to read articles, `verified::`/`updated::`/`volatility::` attributes for freshness, `[[link]]`/backlink density for connectedness. `fix` edits via `roam_apply_page_ops`. Reports still write to `.librarian/` on disk.
+- **audit** — hybrid, like lint: the wiki-content pass reads articles from the graph (reuse librarian's roam-aware scan); the output-drift pass and session-provenance pass stay on disk; source-chain resolution crosses the boundary by resolving each artifact's `sources:`/`raw-source::` entries against `raw/` and against Roam page titles. Reports still write to `.audit/` on disk.
+- **output** — gather the article content the artifact synthesizes from the graph (`roam_fetch_page_by_title`/`roam_search_by_text`); the artifact is still written to `output/` on disk. Cite Roam articles by page title in the artifact's `sources:` frontmatter (plus disk `raw/` paths as usual).
+- **archive** — the Roam graph is **not** moved or deleted; archiving moves only the on-disk topic directory and flips `wikis.json` `status: "archived"`, which excludes the graph from default workflows. Preserve `backend`/`roam_graph` through archive/restore. `peek` reads `raw/_index.md` on disk plus, if cheap, a titles-only `roam_datomic_query`.
+- **research** — its pipeline is search → ingest → compile. Ingest writes `raw/` on disk (unchanged); the compile step is roam-aware per the section above. No research-specific Roam logic beyond that.
+- **refresh / ll / inventory / dataset / session / feedback / retract** — disk-only or operate on `raw/`; unaffected by the backend.
+
 ## Concerns / boundaries to respect
 
 - **Availability:** roam-backend `compile`/`lint --fix` require the MCP server up with `ROAM_MUTATE=1`. If the backend is unreachable, stop — never split a wiki across files+roam.

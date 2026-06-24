@@ -66,6 +66,17 @@ npx promptfoo@latest eval -c tests/promptfooconfig.yaml
 
 Requires `ANTHROPIC_API_KEY`. Costs ~$2-5 per run.
 
+### Roam backend
+
+The optional `roam` backend (`references/roam-backend.md`) stores the compiled
+`wiki/` layer in a self-hosted Roam graph via a Roam MCP server instead of
+markdown files. The structural tests and golden-wiki fixtures only cover the
+default `files` backend. To exercise the roam backend, point a topic at a Roam
+MCP server registered with `ROAM_DRY_RUN=1` (writes become no-ops) or a
+disposable test graph — never a production graph. There is no offline structural
+fixture for it yet; `compile`/`lint --fix` on the roam backend require the server
+up with `ROAM_MUTATE=1`.
+
 ### When to update tests
 
 - **Added a new lint rule**: add a defect fixture in `generate-defect-fixtures.sh` and a negative test case in `test-structure.sh`.
@@ -93,7 +104,7 @@ claude-plugin/                  — source of truth, primary distribution target
   commands/*.md                 — command specs, including user commands, wiki router, and the deprecated thesis shim
   skills/wiki-manager/
     SKILL.md                    — skill manifest + fuzzy router
-    references/*.md             — reference docs (hub-resolution, archive, linting, audit, etc.)
+    references/*.md             — reference docs (hub-resolution, archive, linting, audit, roam-backend, etc.)
   .claude-plugin/
     plugin.json                 — plugin manifest
 plugins/llm-wiki/               — generated Codex packaging mirror (do NOT hand-edit)

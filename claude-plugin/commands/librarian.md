@@ -1,7 +1,7 @@
 ---
 description: "Keep the active wiki article layer in check: staleness, quality, accuracy, and coherence. Focused maintenance tool; broader trust audits belong to /wiki:audit."
 argument-hint: "scan [--article <path>] [--resume] [--passes <list>] [--include-archived] | report | fix <id> [--wiki <name|all>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebFetch, WebSearch, Agent
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebFetch, WebSearch, Agent, mcp__roam-direct
 ---
 
 ## Your task
@@ -12,6 +12,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki all` → HUB with an `ALL_TOPICS` flag for step 5; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found. Run `/wiki init` first."
 5. **Hub-level detection**: Librarian operates on the `wiki/` layer of a single topic wiki. The HUB has no `wiki/` subdirectory — only `wikis.json`, `_index.md`, `log.md`, and `topics/`. If `ALL_TOPICS` is set from `--wiki all`, read registered topic wikis from `HUB/wikis.json` (excluding the synthetic `hub` entry) and iterate the scan against each topic wiki sequentially. If the resolved wiki is the HUB (detected by the presence of `wikis.json` and the absence of a `wiki/` subdir) AND the user did not pass `--wiki <name>`, do NOT proceed with the scan against an empty topic surface. Instead, present a numbered list of registered topic wikis from `HUB/wikis.json` and ask the user to pick one. Re-resolve the wiki path with the selected name (`HUB/topics/<name>/`) and continue.
+6. **Resolve the backend.** Check the resolved topic's `wikis.json` entry for `backend: "roam"` (else the global `wiki_backend` in `config.json`, else `files`). If **roam**, read `skills/wiki-manager/references/roam-backend.md` § Other commands and run the article-layer scan against the Roam graph (`roam_datomic_query`/`roam_fetch_page_by_title` for staleness/quality/coherence; `verified::`/`updated::`/`volatility::` attributes for freshness). `--fix` edits via `roam_apply_page_ops`. The default **files** backend behaves exactly as below.
 
 Read the librarian reference at `skills/wiki-manager/references/librarian.md`. Then execute the requested subcommand.
 

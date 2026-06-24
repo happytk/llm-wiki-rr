@@ -1,7 +1,7 @@
 ---
 description: "Generate output artifacts from active wiki content — summaries, reports, study guides, slide outlines, timelines, glossaries, comparisons. Outputs are filed back into the wiki."
 argument-hint: "<type> [--topic <topic>] [--sources <paths>] [--with <wiki>...] [--include-archived] [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(date:*), Bash(python3:*)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(date:*), Bash(python3:*), mcp__roam-direct
 ---
 
 ## Your task
@@ -11,6 +11,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(date:*), Bash(pyt
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found (or no articles). Run `/wiki init` and `/wiki:compile` first."
+5. **Resolve the backend.** Check the resolved wiki's `wikis.json` entry for `backend: "roam"` (else the global `wiki_backend` in `config.json`, else `files`). If **roam**, read `skills/wiki-manager/references/roam-backend.md` § Other commands: gather the article content the artifact synthesizes from the Roam graph (`roam_fetch_page_by_title`/`roam_search_by_text`) instead of reading `wiki/*.md`. The generated artifact is still **written to `output/` on disk** as usual; in its `sources:` frontmatter, cite Roam articles by page title (and any disk `raw/` paths normally). The default **files** backend behaves exactly as below.
 
 Generate an output artifact from wiki content based on $ARGUMENTS.
 
