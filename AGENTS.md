@@ -105,11 +105,13 @@ stay on disk.
 
 - **`files`** (default) — articles are markdown files under `wiki/` with derived
   `_index.md` caches. Everything below assumes this unless stated.
-- **`roam`** — articles live as pages in a self-hosted Roam graph (one graph per
-  topic wiki), written/read through a Roam MCP server (e.g. `roam-direct`) using
+- **`roam`** — articles live as pages in a self-hosted Roam graph (local or
+  hosted, e.g. on fly.dev), written/read through a connected Roam MCP server
+  whose alias you set in `roam_server` (e.g. `roam`, `roam-wiki`, `roam-direct`).
+  The alias selects the graph — each server points at one `ROAM_GRAPH`. Uses
   batch tools (`roam_replace_page`, `roam_apply_page_ops`, `roam_create_block`
   with a nested `children` tree, `roam_create_table`) and `roam_datomic_query`
-  for reads.
+  for reads. Writes need the server registered with `ROAM_MUTATE=1`.
 
 Resolve the backend right after the wiki: a `wikis.json` topic entry's
 `backend: "roam"` (with `roam_graph`/`roam_server`) wins; else a global

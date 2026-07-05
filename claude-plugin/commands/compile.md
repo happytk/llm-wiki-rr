@@ -1,7 +1,7 @@
 ---
 description: "Compile raw sources into wiki articles. Synthesizes, cross-references, and organizes active knowledge."
 argument-hint: "[--full] [--source <path>] [--topic <name>] [--include-archived] [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), mcp__roam-direct
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
 ---
 
 ## Your task

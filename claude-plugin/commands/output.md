@@ -1,7 +1,7 @@
 ---
 description: "Generate output artifacts from active wiki content — summaries, reports, study guides, slide outlines, timelines, glossaries, comparisons. Outputs are filed back into the wiki."
 argument-hint: "<type> [--topic <topic>] [--sources <paths>] [--with <wiki>...] [--include-archived] [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(date:*), Bash(python3:*), mcp__roam-direct
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(date:*), Bash(python3:*), mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
 ---
 
 ## Your task

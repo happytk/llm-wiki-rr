@@ -1,7 +1,7 @@
 ---
 description: "Ask questions against the compiled wiki. Supports quick/standard/deep depth levels, --list for browsing, --include-archived for explicit archived reads, and --resume to reload context after a session break. Answers from wiki content only, with citations."
 argument-hint: "<question> [--quick] [--deep] [--raw] [--list] [--include-archived] [--resume] [--tag <tag>] [--category concepts|topics|references] [--with <wiki>...] [--wiki <name>] [--local]"
-allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit, mcp__roam-direct
+allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
 ---
 
 ## Your task

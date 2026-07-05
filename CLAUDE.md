@@ -70,12 +70,20 @@ Requires `ANTHROPIC_API_KEY`. Costs ~$2-5 per run.
 
 The optional `roam` backend (`references/roam-backend.md`) stores the compiled
 `wiki/` layer in a self-hosted Roam graph via a Roam MCP server instead of
-markdown files. The structural tests and golden-wiki fixtures only cover the
-default `files` backend. To exercise the roam backend, point a topic at a Roam
-MCP server registered with `ROAM_DRY_RUN=1` (writes become no-ops) or a
-disposable test graph — never a production graph. There is no offline structural
-fixture for it yet; `compile`/`lint --fix` on the roam backend require the server
-up with `ROAM_MUTATE=1`.
+markdown files. The graph can be local (`ROAM_BACKEND=127.0.0.1:9000`) or hosted
+(`ROAM_BACKEND=https://<app>.fly.dev`); a common setup is local Claude Code +
+local `raw/` files + a hosted fly.dev graph reached through an already-connected
+MCP server (no local backend process needed). The `roam_server` alias in the
+wiki config selects which connected server/graph to use — the plugin does not
+hardcode one; commands list several common aliases in `allowed-tools`
+(`roam`, `roam-wiki`, `roam-archive`, `roam-direct`). Prefer a dedicated wiki
+graph over a large personal graph, since `compile` writes one page per article.
+The structural tests and golden-wiki fixtures only cover the default `files`
+backend. To exercise the roam backend, point a topic at a Roam MCP server
+registered with `ROAM_DRY_RUN=1` (writes become no-ops) or a disposable test
+graph — never a production graph. There is no offline structural fixture for it
+yet; `compile`/`lint --fix` on the roam backend require the server up with
+`ROAM_MUTATE=1`.
 
 ### When to update tests
 

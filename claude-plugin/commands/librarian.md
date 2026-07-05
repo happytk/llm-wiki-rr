@@ -1,7 +1,7 @@
 ---
 description: "Keep the active wiki article layer in check: staleness, quality, accuracy, and coherence. Focused maintenance tool; broader trust audits belong to /wiki:audit."
 argument-hint: "scan [--article <path>] [--resume] [--passes <list>] [--include-archived] | report | fix <id> [--wiki <name|all>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebFetch, WebSearch, Agent, mcp__roam-direct
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebFetch, WebSearch, Agent, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
 ---
 
 ## Your task

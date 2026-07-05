@@ -3,7 +3,9 @@
 The wiki has two storage backends for the **compiled `wiki/` layer**:
 
 - **`files`** (default) — compiled articles are markdown files under `wiki/concepts|topics|references|theses/`, with derived `_index.md` caches. This is the original behavior; everything else in these references assumes it unless this file says otherwise.
-- **`roam`** — compiled articles live as **pages in a self-hosted Roam graph**, written and read through the roamresearch-local MCP server (`roam-direct`). The `raw/` evidence layer, `inventory/`, `datasets/`, `output/`, `log.md`, and `config.md` stay on disk exactly as before.
+- **`roam`** — compiled articles live as **pages in a self-hosted Roam graph**, written and read through a Roam MCP server (the roamresearch-local `roam-direct` bridge, or the hosted `roam-mcp` server). The `raw/` evidence layer, `inventory/`, `datasets/`, `output/`, `log.md`, and `config.md` stay on disk exactly as before.
+
+The graph can be local (`ROAM_BACKEND=127.0.0.1:9000`) or **hosted** (`ROAM_BACKEND=https://<app>.fly.dev`) — the backend location does not matter to the wiki; only the connected MCP server alias does. A common topology is: Claude Code + `raw/` files on your local machine, the Roam graph on fly.dev, reached through an already-connected MCP server. No local backend process is required in that case.
 
 > **Only the `wiki/` layer moves to Roam.** Ingest, raw sources, inventory, datasets, outputs, sessions, and logs are unchanged. Roam is the *compiled-knowledge engine*, not a replacement for the evidence or operational layers.
 
@@ -27,16 +29,18 @@ Resolve the backend immediately after resolving the wiki (the HUB + wiki-locatio
      "path": "topics/bitcoin",
      "backend": "roam",
      "roam_graph": "bitcoin",
-     "roam_server": "roam-direct"
+     "roam_server": "roam-wiki"
    }
    ```
-   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name) and `roam_server` (the MCP server alias; default `roam-direct`).
-2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_graph` = the topic slug and `roam_server` = config `roam_server` or `roam-direct`.
+   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name, for reference/logging) and `roam_server` (**the connected MCP server alias to call** — e.g. `roam`, `roam-wiki`, `roam-archive`, or `roam-direct`; there is no fixed default, it is whatever the user registered).
+2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_server` = config `roam_server`. Do not assume a specific alias.
 3. **Otherwise → `files` backend** (default). Proceed exactly as the file-based references describe.
 
-**Topic ↔ graph mapping is 1:1.** Each topic wiki maps to its own Roam graph (one `ROAM_GRAPH` per topic). The MCP server for that graph is registered with `ROAM_GRAPH=<graph>` and `ROAM_MUTATE=1`. The agent calls its tools as `mcp__<roam_server>__roam_*` (e.g. `mcp__roam-direct__roam_replace_page`).
+**`roam_server` selects the graph.** Each Roam MCP server points at exactly one graph (its `ROAM_GRAPH`), so the alias in `roam_server` *is* the graph selector. Set it per topic to route each topic wiki to whichever graph you want — a dedicated wiki graph, a per-topic graph, or (if you accept co-mingling) an existing graph. The agent calls tools as `mcp__<roam_server>__roam_*` (e.g. `mcp__roam-wiki__roam_replace_page`). Writes require that server to be registered with `ROAM_MUTATE=1`.
 
-**Preflight (roam backend only).** Before the first write, confirm the `roam_server` MCP tools are available. If they are not, stop and tell the user: the topic is configured for the roam backend but its Roam MCP server (`<roam_server>`, graph `<roam_graph>`) is not connected. Do **not** silently fall back to writing files — that would split the wiki across two backends.
+> **Prefer a dedicated wiki graph.** `compile` creates one page per article. Pointing `roam_server` at a large personal/daily-notes graph mixes wiki pages into it. Register a separate graph (or MCP alias) for the wiki layer unless you deliberately want them together.
+
+**Preflight (roam backend only).** Before the first write, confirm the `roam_server` MCP tools (`mcp__<roam_server>__*`) are actually connected. If they are not, stop and tell the user: the topic is configured for the roam backend but its Roam MCP server (`<roam_server>`) is not connected. Do **not** silently fall back to writing files — that would split the wiki across two backends. (Note: `allowed-tools` on the commands lists several common aliases; if your alias differs, add `mcp__<your-alias>` there or approve the tool when prompted.)
 
 ---
 
