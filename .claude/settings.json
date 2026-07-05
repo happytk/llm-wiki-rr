@@ -18,7 +18,7 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/wiki-workspace.sh\"",
             "timeout": 5,
-            "statusMessage": "Configuring llm-wiki workspace (roam-archive backend)"
+            "statusMessage": "Configuring llm-wiki workspace (single-graph roam mode: wiki-s)"
           }
         ]
       }

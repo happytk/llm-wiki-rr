@@ -1,7 +1,7 @@
 ---
 description: "Ingest source material into an active wiki. Accepts URLs, file paths, PDFs, freeform text, or processes the inbox. Supports tweets via Grok MCP."
 argument-hint: "<url|filepath|\"text\"> [--type articles|papers|repos|notes|data] [--title \"Title\"] [--inbox] [--keep] [--wiki <name>] [--local] [--auto-classify] [--new-topic <name>] [--project <slug>] [--include-archived]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), Bash(basename:*), Bash(file:*), Bash(curl:*), Bash(mktemp:*), Bash(rm:*), Bash(pdftotext:*), Bash(python3:*), WebFetch, WebSearch, mcp__wiki-raw, mcp__wiki, mcp__roam-wiki, mcp__roam-archive, mcp__roam-direct, mcp__roam
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), Bash(basename:*), Bash(file:*), Bash(curl:*), Bash(mktemp:*), Bash(rm:*), Bash(pdftotext:*), Bash(python3:*), WebFetch, WebSearch, mcp__wiki-raw, mcp__wiki, mcp__wiki-s, mcp__roam-wiki, mcp__roam-archive, mcp__roam-direct, mcp__roam
 ---
 
 ## Your task
@@ -12,7 +12,11 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing and `--new-topic <name>` is set → create the topic wiki (see below). If missing and no `--new-topic` → stop with "No wiki found. Use `--new-topic <name>` to create one, or run `/wiki init` first."
 
-**Backend check.** If `config.json`/`wikis.json` sets `raw_roam_server` (roam backend, two-graph mode — see `skills/wiki-manager/references/roam-backend.md` § Two-graph mode), do NOT write raw files to disk. Instead create a **source page in the raw graph** (`mcp__<raw_roam_server>__*`): `type:: source`, `source-url::`, `ingested:: [[today]]`, `summary::`, `tags::`, extracted content as blocks (upload the original with `roam_upload_file` for binaries), and a `Source: [[Title]]` link on that graph's today daily note. Then stop — `compile` reads it later. Otherwise (disk backend) follow the file protocol below.
+**Backend check.** If `config.json`/`wikis.json` sets `raw_roam_server` (roam backend — see `skills/wiki-manager/references/roam-backend.md`), do NOT write raw files to disk; create a **source page in Roam** instead, then stop — `compile` reads it later. Two cases:
+- **Two-graph mode** (`raw_roam_server` ≠ `roam_server`, § Two-graph mode): write to the raw graph (`mcp__<raw_roam_server>__*`) with `type:: source`, `source-url::`, `ingested:: [[today]]`, `summary::`, `tags::`, extracted content as blocks (`roam_upload_file` for binaries), and a `Source: [[Title]]` link on that graph's today daily note.
+- **Single-graph mode** (`raw_roam_server` == `roam_server`, or `raw_mode: "namespace"`, § Single-graph mode): write to the **one** graph as a **`RAW/<Source Title>`** page (namespace prefix from `raw_namespace`, default `RAW/`) with the same attributes, and add a non-destructive `Source: [[RAW/<Source Title>]]` link back to the originating daily-note block (leave the user's block intact). The daily note is the inbox; the user may drop URLs/docs/emails/text there or ask you to attach material into it first.
+
+Otherwise (disk backend) follow the file protocol below.
 
 Read the ingestion protocol at `skills/wiki-manager/references/ingestion.md` and the structure spec at `skills/wiki-manager/references/wiki-structure.md`. Then ingest source material.
 

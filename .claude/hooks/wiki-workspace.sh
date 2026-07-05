@@ -2,13 +2,22 @@
 # llm-wiki web-session workspace bootstrap.
 #
 # Runs at SessionStart for Claude Code sessions on this repo. It configures the
-# roam backend two-graph mode: ingested originals go to the `wiki-raw` graph and
-# compiled articles go to the `wiki` graph, via the connected Roam MCP connectors.
+# roam backend SINGLE-GRAPH mode: one Roam graph (reached through one connected
+# MCP connector) holds the whole pipeline. Raw sources are pages titled
+# `RAW/<title>`; compiled articles are ordinary unprefixed pages. The flow is
+#   DailyNote (URLs / docs / emails / text)  ->  RAW/*  ->  <Article Title>
+# all inside the one `wiki-s` graph. Because raw and wiki share a graph, an
+# article links its sources with real `[[RAW/...]]` page links and gets Roam
+# backlinks for free. See references/roam-backend.md § Single-graph mode.
 #
 # Content vs. code separation: this repo holds the SKILL/plugin code (git,
 # reviewed via PRs). Wiki CONTENT is NOT committed here — it lives dynamically in
 # Roam. So the hub points at an EPHEMERAL scratch dir (outside the repo); there is
 # no durable `raw/` and nothing wiki-content-related ever lands in git.
+#
+# The `wiki-s` MCP connector is provided by the user (register a Roam MCP server
+# whose ROAM_GRAPH is the test graph, with ROAM_MUTATE=1 for writes). If the alias
+# differs, change roam_server/raw_roam_server below to match.
 #
 # Scope: only sessions launched on this repo run this hook. It writes just the
 # llm-wiki config. Delete this hook (and the .claude/settings.json SessionStart
@@ -23,9 +32,11 @@ cat > "$CFG_DIR/config.json" <<EOF
 {
   "hub_path": "$HUB_DIR",
   "wiki_backend": "roam",
-  "roam_server": "wiki",
-  "raw_roam_server": "wiki-raw"
+  "roam_server": "wiki-s",
+  "raw_roam_server": "wiki-s",
+  "raw_mode": "namespace",
+  "raw_namespace": "RAW/"
 }
 EOF
 
-echo "llm-wiki: two-graph roam mode -> raw=wiki-raw, wiki=wiki (content in Roam, not git)"
+echo "llm-wiki: single-graph roam mode -> graph=wiki-s, raw=RAW/* pages, wiki=unprefixed pages (DailyNote -> RAW/* -> article; content in Roam, not git)"
