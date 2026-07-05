@@ -1,7 +1,7 @@
 ---
 description: "Compile raw sources into wiki articles. Synthesizes, cross-references, and organizes active knowledge."
 argument-hint: "[--full] [--source <path>] [--topic <name>] [--include-archived] [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive, mcp__wiki, mcp__wiki-raw
 ---
 
 ## Your task
@@ -40,6 +40,8 @@ raw sources to update active articles.
 ### Compilation Process
 
 > **Roam backend:** follow `references/roam-backend.md` for steps 4–8. In short: determine already-compiled sources with a `roam_datomic_query` over `raw-source::` (not a `wiki/_index.md` read); skip the placement pre-check (step 0) and bidirectional-link step (step 6 — Roam backlinks are automatic); write each article as one nested `children` tree via `roam_replace_page` (one transaction per article, never block-by-block); cross-link with `[[Title]]` page links, never `((uid))`; and in step 7 update only the on-disk master `_index.md` stats (there is no `wiki/_index.md`). Everything else (survey of `raw/`, reading sources, logging) is unchanged.
+>
+> **Two-graph mode (raw graph → wiki graph):** when `raw_roam_server` is set (see `references/roam-backend.md` § Two-graph mode), determine uncompiled sources by querying the **raw graph** (`mcp__<raw_roam_server>__roam_datomic_query` for `type:: source` pages lacking a `compiled::` value, or filtered by `ingested:: [[date]]` range / a day's daily note) instead of surveying disk `raw/`. Read those source pages, synthesize, and write articles to the **wiki graph** (`mcp__<roam_server>__*`). After each source is compiled, stamp it in the raw graph with `compiled:: [[today]]` and `compiled-into:: <Article Title>`. Provenance on the article is text (`source-title::`/`source-url::`), not a cross-graph `[[link]]`. Also honor "compile the source I just added to <raw graph>" — read the page the user names.
 >
 > **Roam-native capture mode (raw-free):** when the wiki has no durable `raw/` layer (see `references/roam-backend.md` § Roam-native capture mode), compile directly from the explicitly-provided input — conversation (`compiled-from:: conversation`) or a fetched URL (`source-url::`, raw not kept) — with no raw survey. Topic is optional (`topic::` only when the user names one). On each capture, also add a `Wiki: [[Title]]` block to today's daily note (`roam_add_to_daily_note`, omit the date) and stamp `captured:: [[<today ordinal>]]`. Only ever capture when the user explicitly asks.
 
