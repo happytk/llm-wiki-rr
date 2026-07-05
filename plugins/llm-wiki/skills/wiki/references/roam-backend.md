@@ -101,27 +101,31 @@ Active when `raw_roam_server == roam_server` (or `raw_mode: "namespace"`). This 
 
 The **daily note is the inbox.** The user drops sources into today's (or any day's) daily note — or an external agent/this repo attaches them there — and each becomes one `RAW/…` page. A "source block" is any of:
 
-| In the daily note | Becomes `RAW/<title>` with |
-|---|---|
-| A bare URL / link block | fetched + extracted content as child blocks, `source-url:: <url>` |
-| An `.pdf`/file upload or attachment | `roam_upload_file` the original, `file:: <url>`, extracted text as blocks |
-| An email (pasted headers + body) | `source:: email`, `from::`/`date::` when present, body as blocks |
-| A pasted-text / freeform block | the text as blocks, `source:: note` |
-| A block that already `[[links]]` a page | treat that page as the source (no new RAW page unless the user wants a copy) |
+Sources split by **where the body lives**, which decides copy-vs-move (see step 2):
+
+| In the daily note | Body lives… | Becomes `RAW/<title>` by |
+|---|---|---|
+| A bare URL / link block | outside the graph | **fetch + extract** into RAW child blocks, `source-url:: <url>` |
+| An `.pdf`/file upload or attachment | outside the graph | `roam_upload_file` the original, `file:: <url>`, **extract** text into blocks |
+| An email / pasted text / freeform / meeting notes typed into the daily note | **already in the graph** (on the daily note) | **move** the block(s) under the RAW page (`roam_move_block`); do **not** copy. `source:: email\|note` |
+| A block that already `[[links]]` a page | on that page | treat that page as the source (no new RAW page unless the user wants a copy) |
 
 The user may also point at a specific block or page directly ("ingest this") — honor that regardless of where it sits.
+
+**Copy vs move — the key rule.** Never duplicate a body that is already in the graph. If the source content was pasted/typed into the daily note (meeting notes, an email, freeform text), that text is the raw source and it already exists once — **move** it into the RAW page rather than copying it (which would leave two copies). Only content that lives *outside* the graph (a URL's page, an uploaded file's text) is *extracted into* RAW.
 
 ### Ingest: DailyNote → `RAW/<title>` page
 
 Triggered explicitly (`/wiki:ingest`, "put today's sources into raw", "이거 RAW로 넣어줘"). For each source block:
 
-1. **Resolve title & content.** Fetch the URL / read the attachment / take the pasted text; derive a human title. Title the page `RAW/<Source Title>`. On collision with an existing `RAW/<Source Title>`, append ` (<ordinal date>)` or a `-2` counter — never overwrite an existing raw page (raw is immutable).
-2. **Write one page** with `roam_replace_page({ title: "RAW/<Source Title>", children:[…] })` in a single transaction:
-   - attributes: `type:: source`, `source-url:: <url>` **or** `source:: <where it came from>`, `ingested:: [[<today ordinal>]]`, `summary::`, `tags::`, and optional `topic::`.
-   - the extracted content as an outliner subtree (one idea per block), so the page is self-contained. For binaries/PDFs, `roam_upload_file` the original and add `file:: <url>`.
-3. **Link it back to the daily note (non-destructive).** Add a child link under the originating daily-note block — or a fresh block on today's daily note — `Source: [[RAW/<Source Title>]] [[META/Log]] — <one-line>`. Leave the user's original block intact; the daily note becomes the dated index/log, and the RAW page's backlinks show that day. No separate `captured::` stamp is needed in this mode — the RAW page already carries `ingested:: [[today]]` (step 2) and the daily-note link provides the date backlink; `captured::` is only for capture mode, where there is no `ingested::` (see Roam-native capture mode). Do not delete what the user wrote.
+1. **Resolve title.** Fetch the URL / read the attachment / read the pasted text; derive a human title. Title the page `RAW/<Source Title>`. On collision with an existing `RAW/<Source Title>`, append ` (<ordinal date>)` or a `-2` counter — never overwrite an existing raw page (raw is immutable).
+2. **Create the RAW page and place the body — copy for external, move for in-graph:**
+   - **External body (URL / attachment):** `roam_replace_page({ title: "RAW/<Source Title>", children:[…] })` in one transaction, writing the extracted content as an outliner subtree (one idea per block) so the page is self-contained. For binaries/PDFs, `roam_upload_file` the original and add `file:: <url>`.
+   - **In-graph body (pasted text / email / meeting notes on the daily note):** first create the empty `RAW/<Source Title>` page (`roam_create_page` + an attributes block), then **`roam_move_block`** the user's pasted block(s) from the daily note under that page. The body is relocated, **not** copied — so it exists exactly once, now on the RAW page. Do not re-type or duplicate it.
+   - In both cases the page carries: `type:: source`, `source-url:: <url>` **or** `source:: <where it came from>` (`email`/`note`), `ingested:: [[<today ordinal>]]`, `summary::`, `tags::`, and optional `topic::`.
+3. **Leave a link in the daily note.** Where the body used to be (for a move) or under the originating block (for a URL), put `Source: [[RAW/<Source Title>]] [[META/Log]] — <one-line>`. The daily note keeps a clean, dated index/log entry pointing at the RAW page; the body is no longer duplicated there. No `captured::` stamp — the RAW page's `ingested:: [[today]]` (step 2) plus this daily-note link provide the date backlink; `captured::` is capture-mode only (no `ingested::` there). **Preserve the user's content** — move it, never delete it.
 
-Because it is one graph, the daily note ↔ RAW ↔ article links are all **real** `[[links]]` with automatic backlinks — no text-only provenance anywhere in this mode.
+Because it is one graph, the daily note ↔ RAW ↔ article links are all **real** `[[links]]` with automatic backlinks, and every body lives exactly once — no duplicated content and no text-only provenance in this mode.
 
 ### Compile: `RAW/<title>` → `<Article Title>`
 
