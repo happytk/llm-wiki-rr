@@ -1,7 +1,7 @@
 ---
 description: "Run health checks on the wiki. Find broken links, missing indexes, stale content, archive registry drift, inconsistencies, and suggest improvements."
 argument-hint: "[--fix] [--deep] [--include-archived] [--archived-only] [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebSearch, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mv:*), Bash(mkdir:*), WebSearch, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive, mcp__wiki, mcp__wiki-raw, mcp__wiki-s
 ---
 
 ## Your task

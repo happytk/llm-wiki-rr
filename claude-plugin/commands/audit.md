@@ -1,7 +1,7 @@
 ---
 description: "Truth-seeking umbrella audit for llm-wiki. Combines active wiki maintenance, output drift checks, provenance review, and fresh research when trust is in doubt."
 argument-hint: "scan [--artifact <path>] [--project <slug>] [--wiki-only] [--outputs-only] [--quick] [--fresh] [--include-archived] | report [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), WebFetch, WebSearch, Agent, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), WebFetch, WebSearch, Agent, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive, mcp__wiki, mcp__wiki-raw, mcp__wiki-s
 ---
 
 ## Your task

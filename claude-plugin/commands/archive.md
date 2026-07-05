@@ -1,7 +1,7 @@
 ---
 description: "Archive or restore whole topic wikis so old interests stay preserved but out of default context. Archived topics move under HUB/topics/.archive and are hidden from normal semantic and maintenance workflows."
 argument-hint: "list [--archived] | topic <slug> [--reason \"why\"] | restore <slug> | peek <query> [--wiki <name>] [--include-archived]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(mkdir:*), Bash(mv:*), Bash(date:*), Bash(python3:*), mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(mkdir:*), Bash(mv:*), Bash(date:*), Bash(python3:*), mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive, mcp__wiki, mcp__wiki-raw, mcp__wiki-s
 ---
 
 ## Your task

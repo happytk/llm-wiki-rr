@@ -1,7 +1,7 @@
 ---
 description: "Ask questions against the compiled wiki. Supports quick/standard/deep depth levels, --list for browsing, --include-archived for explicit archived reads, and --resume to reload context after a session break. Answers from wiki content only, with citations."
 argument-hint: "<question> [--quick] [--deep] [--raw] [--list] [--include-archived] [--resume] [--tag <tag>] [--category concepts|topics|references] [--with <wiki>...] [--wiki <name>] [--local]"
-allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
+allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive, mcp__wiki, mcp__wiki-raw, mcp__wiki-s
 ---
 
 ## Your task
@@ -57,7 +57,7 @@ quiet by default:
 
 ### Index Freshness Check
 
-(**Roam backend:** skip this section — there is no `wiki/_index.md`. Datalog/backlinks are always current. Map the depth levels below to graph queries per `references/roam-backend.md`: Quick ≈ search + attribute pull, Standard ≈ fetch matched pages, Deep ≈ fetch + follow `[[links]]` + backlinks + grep `raw/` on disk. In capture mode, filter by `topic:: <name>` only when the user names a topic; otherwise search the whole graph.)
+(**Roam backend:** skip this section — there is no `wiki/_index.md`. Datalog/backlinks are always current. Map the depth levels below to graph queries per `references/roam-backend.md`: Quick ≈ search + attribute pull, Standard ≈ fetch matched pages, Deep ≈ fetch + follow `[[links]]` + backlinks + grep `raw/` on disk. In capture mode, filter by `topic:: <name>` only when the user names a topic; otherwise search the whole graph. In single-graph mode, exclude `RAW/…` source pages (and daily notes) when answering — they share the graph with articles; follow an article's `source:: [[RAW/…]]` links only for provenance.)
 
 Before using any `_index.md`, verify it's current: count `.md` files in the directory (excluding `_index.md`) and compare against rows in the index table. If counts differ, rebuild the index inline from file frontmatter before proceeding. See `references/indexing.md` Derived Index Protocol.
 

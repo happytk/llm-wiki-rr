@@ -11,6 +11,17 @@ The graph can be local (`ROAM_BACKEND=127.0.0.1:9000`) or **hosted** (`ROAM_BACK
 
 This split is deliberate: `raw/` is immutable provenance that belongs in git and on disk; `wiki/` is living, heavily cross-linked synthesis that Roam's outliner + backlinks + Datalog model better than flat markdown.
 
+The roam backend has **four topologies**, selected by config (see Backend Resolution):
+
+| Topology | raw layer | wiki layer | Provenance link | When |
+|---|---|---|---|---|
+| **roam (single-layer)** | disk `raw/*.md` | Roam graph | text `raw-source::` path | keep git-tracked raw, move only synthesis to Roam |
+| **Two-graph** | `raw_roam_server` graph | `roam_server` graph | text `source-title::`/`source-url::` (links can't cross graphs) | durable dated source archive, fully in Roam, kept separate from the wiki |
+| **Single-graph raw** | `RAW/…` pages in the *same* graph | unprefixed pages in that graph | **real `[[RAW/…]]` page link + automatic backlinks** | one graph, one connector; `DailyNote → RAW/* → article` all in place |
+| **Capture (raw-free)** | none (ephemeral) | Roam graph | `source-url::` / `compiled-from:: conversation` | phone-first / "just put this in my wiki", no durable raw |
+
+Single-graph raw mode is the newest and the simplest to operate: **DailyNote → `RAW/<title>` pages → unprefixed article pages**, everything in one graph reached through one MCP connector. Because raw and wiki share a graph, an article links its sources with ordinary `[[RAW/<title>]]` page links and gets Roam backlinks for free — the cross-graph provenance compromise of two-graph mode disappears. See § Single-graph mode.
+
 ---
 
 ## When this file applies
@@ -33,9 +44,16 @@ Resolve the backend immediately after resolving the wiki (the HUB + wiki-locatio
      "raw_roam_server": "wiki-raw"
    }
    ```
-   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name, for reference/logging), `roam_server` (**the connected MCP alias for the compiled wiki graph** — e.g. `wiki`, `roam-wiki`, `roam-archive`; whatever the user registered), and the optional `raw_roam_server` (the alias for a **separate raw/source graph** — see Two-graph mode). If `raw_roam_server` is absent, raw is on disk or raw-free.
-2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_server` = config `roam_server` (and `raw_roam_server` if present). Do not assume a specific alias.
+   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name, for reference/logging), `roam_server` (**the connected MCP alias for the compiled wiki graph** — e.g. `wiki`, `roam-wiki`, `roam-archive`, `wiki-s`; whatever the user registered), the optional `raw_roam_server` (the alias for the raw/source graph), and the optional `raw_namespace` (the title prefix for raw pages in single-graph mode; default `RAW/`). If `raw_roam_server` is absent, raw is on disk or raw-free.
+2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_server` = config `roam_server` (and `raw_roam_server`/`raw_namespace` if present). Do not assume a specific alias.
 3. **Otherwise → `files` backend** (default). Proceed exactly as the file-based references describe.
+
+**Which roam topology?** Once the roam backend is resolved, pick the raw-layer topology:
+
+- `raw_roam_server` set **and different** from `roam_server` → **Two-graph mode** (separate raw + wiki graphs).
+- `raw_roam_server` **equals** `roam_server` (same alias/graph), **or** `raw_mode: "namespace"` is set → **Single-graph mode**: raw and wiki share one graph, and raw pages are distinguished by the `raw_namespace` title prefix (default `RAW/`). This is the mode to use when you only have one connector/graph.
+- `raw_roam_server` absent, raw is on disk → **single-layer roam** (raw stays in `raw/*.md`; only the wiki layer is in Roam).
+- No durable raw at all → **Capture mode** (raw-free).
 
 **`roam_server` selects the graph.** Each Roam MCP server points at exactly one graph (its `ROAM_GRAPH`), so the alias in `roam_server` *is* the graph selector. Set it per topic to route each topic wiki to whichever graph you want — a dedicated wiki graph, a per-topic graph, or (if you accept co-mingling) an existing graph. The agent calls tools as `mcp__<roam_server>__roam_*` (e.g. `mcp__roam-wiki__roam_replace_page`). Writes require that server to be registered with `ROAM_MUTATE=1`.
 
@@ -62,6 +80,84 @@ Flow:
 - `source-title:: <raw page title>` and `source-url:: <url>` (and optionally the raw page's deep-link URL). Within each graph, real `[[links]]` still work (article↔article in `wiki`; source↔source in `wiki-raw`). `raw-source::` (disk path) is not used in this mode.
 
 Everything else about the wiki graph (attribute mapping, `[[title]]` article links, batch `roam_replace_page` writes, daily-note capture log, Datalog reads/lint) is exactly as in the single-graph roam backend — it just points at `roam_server` while ingest points at `raw_roam_server`.
+
+---
+
+## Single-graph mode (raw + wiki in one graph, `RAW/` namespace)
+
+**One graph, one connector.** Raw sources and compiled articles live in the **same** Roam graph, told apart by a **title namespace**: every raw page is titled `RAW/<source title>` (prefix from `raw_namespace`, default `RAW/`); every article is an ordinary unprefixed page. The pipeline is:
+
+```
+DailyNote (URLs / docs / emails / pasted text)
+   → RAW/<source title>   (durable, immutable source pages)
+      → <Article Title>    (compiled, unprefixed wiki pages)
+```
+
+Active when `raw_roam_server == roam_server` (or `raw_mode: "namespace"`). This is the mode for "I have one graph and one MCP connector and I want the whole source→raw→wiki pipeline inside it."
+
+**Why a namespace, not just any prefix-free page.** Do **not** treat "any page without the `RAW/` prefix" as an article — daily notes (dated pages), `#tag` pages, and attribute pages are all unprefixed too. Articles are identified **positively** by their attributes (`category::`, and the `updated::`/`verified::` stamps compile writes), exactly as everywhere else. The `RAW/` prefix marks the *raw* layer; it is not a definition of "article." Every query below filters on `RAW/` (in or out) explicitly, never on "no prefix."
+
+### What counts as a source (daily-note inputs)
+
+The **daily note is the inbox.** The user drops sources into today's (or any day's) daily note — or an external agent/this repo attaches them there — and each becomes one `RAW/…` page. A "source block" is any of:
+
+| In the daily note | Becomes `RAW/<title>` with |
+|---|---|
+| A bare URL / link block | fetched + extracted content as child blocks, `source-url:: <url>` |
+| An `.pdf`/file upload or attachment | `roam_upload_file` the original, `file:: <url>`, extracted text as blocks |
+| An email (pasted headers + body) | `source:: email`, `from::`/`date::` when present, body as blocks |
+| A pasted-text / freeform block | the text as blocks, `source:: note` |
+| A block that already `[[links]]` a page | treat that page as the source (no new RAW page unless the user wants a copy) |
+
+The user may also point at a specific block or page directly ("ingest this") — honor that regardless of where it sits.
+
+### Ingest: DailyNote → `RAW/<title>` page
+
+Triggered explicitly (`/wiki:ingest`, "put today's sources into raw", "이거 RAW로 넣어줘"). For each source block:
+
+1. **Resolve title & content.** Fetch the URL / read the attachment / take the pasted text; derive a human title. Title the page `RAW/<Source Title>`. On collision with an existing `RAW/<Source Title>`, append ` (<ordinal date>)` or a `-2` counter — never overwrite an existing raw page (raw is immutable).
+2. **Write one page** with `roam_replace_page({ title: "RAW/<Source Title>", children:[…] })` in a single transaction:
+   - attributes: `type:: source`, `source-url:: <url>` **or** `source:: <where it came from>`, `ingested:: [[<today ordinal>]]`, `summary::`, `tags::`, and optional `topic::`.
+   - the extracted content as an outliner subtree (one idea per block), so the page is self-contained. For binaries/PDFs, `roam_upload_file` the original and add `file:: <url>`.
+3. **Link it back to the daily note (non-destructive).** Add a child link under the originating daily-note block — or a fresh block on today's daily note — `Source: [[RAW/<Source Title>]]`, and stamp the RAW page with `captured:: [[<today ordinal>]]`. Leave the user's original block intact; the daily note becomes a dated index whose backlinks show the day on the RAW page. Do not delete what the user wrote.
+
+Because it is one graph, the daily note ↔ RAW ↔ article links are all **real** `[[links]]` with automatic backlinks — no text-only provenance anywhere in this mode.
+
+### Compile: `RAW/<title>` → `<Article Title>`
+
+Reads uncompiled `RAW/…` pages, synthesizes article pages (unprefixed), and stamps provenance — all in the same graph:
+
+1. **Find uncompiled raw pages** — `roam_datomic_query`: pages whose title starts with the namespace and that lack a `compiled::` value:
+   ```
+   [:find (pull ?p [:node/title]) :where
+     [?p :node/title ?t] [(clojure.string/starts-with? ?t "RAW/")]
+     (not [?b :block/page ?p] [?b :block/string ?s]
+          [(clojure.string/starts-with? ?s "compiled::")])]
+   ```
+   (Filter by `ingested:: [[date]]` range, or read a specific day's daily note, for "compile what I added this week/today.")
+2. **Synthesize** one or more article pages from the raw content. Write each as one nested `children` tree via `roam_replace_page({ title:"<Article Title>", … })` — one transaction per article. The article title is unprefixed and **must never** start with `RAW/` or collide with an ordinal date (daily-note collision).
+3. **Provenance is a real link, not text.** Under a `Sources` parent block, list each source as `[[RAW/<Source Title>]]`, and add a `source:: [[RAW/<Source Title>]]` attribute (one value per source, Datalog-queryable). The RAW page's linked-references now show every article built from it — this is the coverage index. (`raw-source::` disk paths and cross-graph `source-title::` text are **not** used in this mode.)
+4. **Stamp the raw page** (not the article) so it is not recompiled: `roam_apply_page_ops` to add `compiled:: [[<today ordinal>]]` and `compiled-into:: [[<Article Title>]]` to the `RAW/…` page. Never rewrite the raw page's content — raw is immutable; only append these two provenance attributes.
+5. **Capture log** — add `Wiki: [[<Article Title>]] — <one-line summary>` to today's daily note (`roam_add_to_daily_note`, omit the date). Set `compiled-from:: sources`, plus `created::`/`updated::`/`verified:: [[<today>]]` on the article as usual.
+
+### Reading / query (single-graph mode)
+
+Search and tag tools now return **both** raw and article pages from the one graph, so filter by layer:
+
+- **Answering wiki questions** → exclude `RAW/…` pages (`(not (clojure.string/starts-with? ?t "RAW/"))`), daily notes, and tag pages; answer from articles, cite by page title.
+- **Provenance / "where did this come from"** → follow the article's `source:: [[RAW/…]]` links (or a raw page's backlinks) — no disk hop.
+- **Full-text into raw** → `roam_search_by_text` and keep only `RAW/…` hits when you specifically want source evidence.
+
+### Lint / coverage (single-graph mode)
+
+All in-graph, no disk crossing:
+
+- **Coverage (C6):** every `RAW/…` page should have ≥1 backlink from an article (or a `compiled::` stamp). Query raw pages with no incoming `source::` link → uncompiled/orphan sources.
+- **Provenance (C4b/C18):** every article must carry a non-empty `source:: [[RAW/…]]` (or `compiled-from:: conversation`). No path-resolution against disk.
+- **Link integrity (C4):** `[[RAW/…]]` targets that don't exist as pages → broken source links.
+- C2/C11/C14/C15 and `--fix` behave exactly as the roam backend section below (`roam_apply_page_ops` for one-field fixes). C1/C3 remain N/A.
+
+Everything else (attribute mapping, batch writes, `roam_apply_page_ops` rewrite rules, no `((uid))` cross-refs, daily-note-collision rule) is identical to the rest of this file.
 
 ---
 
@@ -103,7 +199,8 @@ Page: "Proof of Work"
 | `tags` | `tags:: #tag1 #tag2` | hashtags so they show in Roam backlinks |
 | `aliases` | `aliases:: a, b` | comma-separated |
 | `compiled-from` | `compiled-from:: sources\|conversation\|mixed` | |
-| `sources` | one block per source under a `Sources` parent **and** a `raw-source::` attribute list | see source tracking below |
+| `sources` | one block per source under a `Sources` parent **and** a `raw-source::` attribute list | files/single-layer/two-graph; see source tracking below |
+| `sources` *(single-graph)* | `source:: [[RAW/<title>]]` attribute + `[[RAW/<title>]]` blocks under `Sources` | single-graph mode — real in-graph link, not a path; backlinks give coverage |
 | *(no durable raw)* | `source-url:: <url>` | capture mode — provenance when there is no raw file (see Roam-native capture mode) |
 | *(optional grouping)* | `topic:: <name>` | optional; groups pages within a single graph (see capture mode) |
 | *(capture stamp)* | `captured:: [[<ordinal date>]]` | the daily note the page was captured on |
