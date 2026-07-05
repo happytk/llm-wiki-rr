@@ -6,7 +6,7 @@ Last updated: 2026-07-05
 
 ## Categories
 
-- **articles**: 1 source
+- **articles**: 2 sources
 - **papers**: 0
 - **repos**: 0
 - **notes**: 0

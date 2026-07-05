@@ -6,12 +6,12 @@ Last updated: 2026-07-05
 
 ## Statistics
 
-- Sources: 1 raw document
-- Articles: 1 compiled wiki article
+- Sources: 2 raw documents
+- Articles: 2 compiled wiki articles (1 local markdown, 1 Roam-native)
 - Outputs: 0 generated artifacts
 - Last compiled: 2026-07-05
 - Last lint: never
-- Backend: roam (roam-archive), roam page namespace `wiki/test`
+- Backend: roam (graph `tk-archive`)
 
 ## Quick Navigation
 
@@ -26,3 +26,4 @@ Last updated: 2026-07-05
 - 2026-07-05: Topic initialized
 - 2026-07-05: Ingested "Claude Managed Agents" blog post
 - 2026-07-05: Compiled article `claude-managed-agents` (mirrored to Roam)
+- 2026-07-05: Ingested + compiled "evolution of agentic surfaces" → Roam page in graph `tk-archive` (uid IA2YGklo0)
