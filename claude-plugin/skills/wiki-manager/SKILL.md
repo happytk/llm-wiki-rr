@@ -256,6 +256,8 @@ See `references/research-infrastructure.md` § Agent Prompt Templates for exampl
 
 Every wiki operation appends to `log.md` in the wiki root. Format: `## [YYYY-MM-DD] operation | Description`. See [references/wiki-structure.md](references/wiki-structure.md) for full format. Never edit or delete existing log entries — append only.
 
+**Roam single-graph mode:** the hub is ephemeral, so there is no `log.md` (or `_index.md`) on disk — append the log to a `[[META/Log]]` page and today's daily note, and keep stats on a `[[META/Index]]` page, both in the graph. See [references/roam-backend.md](references/roam-backend.md) § Single-graph mode → Operational state.
+
 ## Confidence Scoring
 
 Wiki articles include a `confidence` field in frontmatter: `high`, `medium`, or `low`.

@@ -44,8 +44,8 @@ Resolve the backend immediately after resolving the wiki (the HUB + wiki-locatio
      "raw_roam_server": "wiki-raw"
    }
    ```
-   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name, for reference/logging), `roam_server` (**the connected MCP alias for the compiled wiki graph** — e.g. `wiki`, `roam-wiki`, `roam-archive`, `wiki-s`; whatever the user registered), the optional `raw_roam_server` (the alias for the raw/source graph), and the optional `raw_namespace` (the title prefix for raw pages in single-graph mode; default `RAW/`). If `raw_roam_server` is absent, raw is on disk or raw-free.
-2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_server` = config `roam_server` (and `raw_roam_server`/`raw_namespace` if present). Do not assume a specific alias.
+   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name, for reference/logging), `roam_server` (**the connected MCP alias for the compiled wiki graph** — e.g. `wiki`, `roam-wiki`, `roam-archive`, `wiki-s`; whatever the user registered), the optional `raw_roam_server` (the alias for the raw/source graph), the optional `raw_namespace` (the title prefix for raw pages in single-graph mode; default `RAW/`), and the optional `meta_namespace` (the title prefix for operational pages — log, index, reports — in single-graph mode; default `META/`). If `raw_roam_server` is absent, raw is on disk or raw-free.
+2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_server` = config `roam_server` (and `raw_roam_server`/`raw_namespace`/`meta_namespace` if present). Do not assume a specific alias.
 3. **Otherwise → `files` backend** (default). Proceed exactly as the file-based references describe.
 
 **Which roam topology?** Once the roam backend is resolved, pick the raw-layer topology:
@@ -144,7 +144,7 @@ Reads uncompiled `RAW/…` pages, synthesizes article pages (unprefixed), and st
 
 Search and tag tools now return **both** raw and article pages from the one graph, so filter by layer:
 
-- **Answering wiki questions** → exclude `RAW/…` pages (`(not (clojure.string/starts-with? ?t "RAW/"))`), daily notes, and tag pages; answer from articles, cite by page title.
+- **Answering wiki questions** → exclude `RAW/…` source pages, `META/…`/`Output/…` operational pages (`(not (clojure.string/starts-with? ?t "RAW/"))` etc.), daily notes, and tag pages; answer from articles (positively: pages with a `category::`), cite by page title.
 - **Provenance / "where did this come from"** → follow the article's `source:: [[RAW/…]]` links (or a raw page's backlinks) — no disk hop.
 - **Full-text into raw** → `roam_search_by_text` and keep only `RAW/…` hits when you specifically want source evidence.
 
@@ -156,6 +156,23 @@ All in-graph, no disk crossing:
 - **Provenance (C4b/C18):** every article must carry a non-empty `source:: [[RAW/…]]` (or `compiled-from:: conversation`). No path-resolution against disk.
 - **Link integrity (C4):** `[[RAW/…]]` targets that don't exist as pages → broken source links.
 - C2/C11/C14/C15 and `--fix` behave exactly as the roam backend section below (`roam_apply_page_ops` for one-field fixes). C1/C3 remain N/A.
+
+### Operational state (log, index, reports) → `META/` pages, never disk
+
+**Single-graph mode writes nothing durable to disk.** The hub is treated as ephemeral (in the web/container setup it is a scratch dir that disappears between sessions). Every operational artifact that other backends keep on disk lives in Roam instead, under a **`META/` namespace** (prefix from `meta_namespace`, default `META/`) — the operational counterpart of the `RAW/` content namespace. Like `RAW/…`, `META/…` pages are **not** articles (they carry no `category::`, so article queries already skip them) and are excluded from query answers.
+
+| Disk artifact (other backends) | Single-graph replacement | How |
+|---|---|---|
+| `log.md` activity log | **`[[META/Log]]`** page | append one block per operation under a `[[<ordinal date>]]` child block: `<operation> — <description>`. Append-only; never rewrite. Also add the human-facing `Wiki: [[Article]]` / `Source: [[RAW/…]]` links to **today's daily note** (`roam_add_to_daily_note`, omit the date) so the daily note stays the chronological index. |
+| master `_index.md` stats / Recent Changes / Last lint | **`[[META/Index]]`** page | attributes updated in place via `roam_apply_page_ops`: `sources:: N`, `articles:: N`, `last-compiled:: [[date]]`, `last-lint:: [[date]]`, plus a `Recent Changes` parent with recent-operation child blocks. Counts are **authoritative from Datalog** (`RAW/…` page count, article `category::` count); `META/Index` is a convenience stamp, so a stale count is a refresh, never a lint failure. |
+| `.librarian/REPORT.md`, `.audit/REPORT.md` | **`[[META/Librarian <ordinal>]]`**, **`[[META/Audit <ordinal>]]`** pages | write the report as a block tree; link it from `META/Index` and today's daily note. |
+| `output/<artifact>.md` | **`[[Output/<name>]]`** page (or deliver to the user directly) | `output` synthesizes into an `Output/…` page in the same graph; cite Roam articles by `[[title]]`. Do not depend on the ephemeral hub for the deliverable. |
+
+Rules:
+
+- **Never create the hub files** (`log.md`, `_index.md`, `wikis.json`, `raw/`, `.librarian/`, `.audit/`, `output/`) in single-graph mode. If the hub scratch dir has none, that is expected — the graph is the durable store. The Structural Guardian's disk checks (hub integrity, index freshness, orphan detection) are **N/A**; run their Roam equivalents (does `META/Index` exist, do its counts match Datalog) or skip with an info line. Do not "repair" by writing files to the ephemeral hub.
+- **`META/Log` append** is the log step for every mutating command (ingest, compile, lint --fix, librarian fix, output). Use `roam_create_block` with `parent_uid` of the date block (or create the date block first).
+- **Sessions/feedback** (`HUB/.sessions/…`) are a separate harness-hook subsystem that also lives on the ephemeral hub; in single-graph mode treat them as best-effort/ephemeral. Promoting a session or feedback note into the wiki writes a `RAW/…` page (then compile), not a disk file.
 
 Everything else (attribute mapping, batch writes, `roam_apply_page_ops` rewrite rules, no `((uid))` cross-refs, daily-note-collision rule) is identical to the rest of this file.
 
@@ -324,8 +341,8 @@ Structural checks shift from filesystem walks to graph queries; cross-boundary c
 1. Determine already-compiled sources: `roam_datomic_query` for all `raw-source::` attribute values across the graph → the set of compiled raw paths.
 2. List `raw/` on disk; the uncompiled set = disk sources − compiled set (also recompile when a source's `ingested:` is newer than the article's `updated::`).
 3. Read uncompiled raw sources from disk, synthesize, write/rewrite article pages with `roam_replace_page`.
-4. Update the on-disk master `_index.md` **stats** (source/article counts) by deriving article counts from a Datalog count; there is no `wiki/_index.md` to rebuild.
-5. Log to `log.md` on disk as usual.
+4. Update the on-disk master `_index.md` **stats** (source/article counts) by deriving article counts from a Datalog count; there is no `wiki/_index.md` to rebuild. **(Single-graph mode: update `[[META/Index]]` in Roam instead — the hub is ephemeral, nothing is written to disk. See § Single-graph mode → Operational state.)**
+5. Log to `log.md` on disk as usual. **(Single-graph mode: append to `[[META/Log]]` + today's daily note instead.)**
 
 ---
 
@@ -333,9 +350,9 @@ Structural checks shift from filesystem walks to graph queries; cross-boundary c
 
 These follow the same backend-resolution step; only their `wiki/`-layer touchpoints change.
 
-- **librarian** — the article-quality scan (staleness, low confidence, weak connections) runs against the graph: `roam_datomic_query`/`roam_fetch_page_by_title` to read articles, `verified::`/`updated::`/`volatility::` attributes for freshness, `[[link]]`/backlink density for connectedness. `fix` edits via `roam_apply_page_ops`. Reports still write to `.librarian/` on disk.
-- **audit** — hybrid, like lint: the wiki-content pass reads articles from the graph (reuse librarian's roam-aware scan); the output-drift pass and session-provenance pass stay on disk; source-chain resolution crosses the boundary by resolving each artifact's `sources:`/`raw-source::` entries against `raw/` and against Roam page titles. Reports still write to `.audit/` on disk.
-- **output** — gather the article content the artifact synthesizes from the graph (`roam_fetch_page_by_title`/`roam_search_by_text`); the artifact is still written to `output/` on disk. Cite Roam articles by page title in the artifact's `sources:` frontmatter (plus disk `raw/` paths as usual).
+- **librarian** — the article-quality scan (staleness, low confidence, weak connections) runs against the graph: `roam_datomic_query`/`roam_fetch_page_by_title` to read articles, `verified::`/`updated::`/`volatility::` attributes for freshness, `[[link]]`/backlink density for connectedness. `fix` edits via `roam_apply_page_ops`. Reports still write to `.librarian/` on disk. **(Single-graph mode: write the report to `[[META/Librarian <ordinal>]]` in Roam — no disk.)**
+- **audit** — hybrid, like lint: the wiki-content pass reads articles from the graph (reuse librarian's roam-aware scan); the output-drift pass and session-provenance pass stay on disk; source-chain resolution crosses the boundary by resolving each artifact's `sources:`/`raw-source::` entries against `raw/` and against Roam page titles. Reports still write to `.audit/` on disk. **(Single-graph mode: everything is in the graph — resolve `source:: [[RAW/…]]` links, write the report to `[[META/Audit <ordinal>]]`, no disk pass.)**
+- **output** — gather the article content the artifact synthesizes from the graph (`roam_fetch_page_by_title`/`roam_search_by_text`); the artifact is still written to `output/` on disk. Cite Roam articles by page title in the artifact's `sources:` frontmatter (plus disk `raw/` paths as usual). **(Single-graph mode: synthesize into an `[[Output/<name>]]` page in the graph, or deliver directly to the user — do not rely on the ephemeral hub.)**
 - **archive** — the Roam graph is **not** moved or deleted; archiving moves only the on-disk topic directory and flips `wikis.json` `status: "archived"`, which excludes the graph from default workflows. Preserve `backend`/`roam_graph` through archive/restore. `peek` reads `raw/_index.md` on disk plus, if cheap, a titles-only `roam_datomic_query`.
 - **research** — its pipeline is search → ingest → compile. Ingest writes `raw/` on disk (unchanged); the compile step is roam-aware per the section above. No research-specific Roam logic beyond that.
 - **refresh / ll / inventory / dataset / session / feedback / retract** — disk-only or operate on `raw/`; unaffected by the backend.
