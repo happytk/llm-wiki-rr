@@ -1,6 +1,10 @@
 # Claude Code repo docs plus internal/user-local state
 .claude/*
 !.claude/release-checklist.md
+# Web-session workspace enablement (committed on purpose — see .claude/hooks)
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/**
 
 # Codex local/project-local state
 .codex/

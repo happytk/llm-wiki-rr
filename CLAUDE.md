@@ -66,6 +66,33 @@ npx promptfoo@latest eval -c tests/promptfooconfig.yaml
 
 Requires `ANTHROPIC_API_KEY`. Costs ~$2-5 per run.
 
+### Roam backend
+
+The optional `roam` backend (`references/roam-backend.md`) stores the compiled
+`wiki/` layer in a self-hosted Roam graph via a Roam MCP server instead of
+markdown files. The graph can be local (`ROAM_BACKEND=127.0.0.1:9000`) or hosted
+(`ROAM_BACKEND=https://<app>.fly.dev`); a common setup is local Claude Code +
+local `raw/` files + a hosted fly.dev graph reached through an already-connected
+MCP server (no local backend process needed). The `roam_server` alias in the
+wiki config selects which connected server/graph to use — the plugin does not
+hardcode one; commands list several common aliases in `allowed-tools`
+(`roam`, `roam-wiki`, `roam-archive`, `roam-direct`). Prefer a dedicated wiki
+graph over a large personal graph, since `compile` writes one page per article.
+`roam-backend.md` also defines a **raw-free capture mode** (explicit-trigger
+only): conversation (`compiled-from:: conversation`) or URL (`source-url::`) →
+a graph page, optional `topic::` grouping, and a daily-note capture log +
+`captured::` stamp — no durable `raw/` and no local hub content, so nothing wiki
+content-related is ever committed to git (skill code is; content lives in Roam).
+For a globally-installed self-hosted Claude Code, enable the plugin in user
+settings and set `wiki_backend`/`roam_server` in `~/.config/llm-wiki/config.json`.
+
+The structural tests and golden-wiki fixtures only cover the default `files`
+backend. To exercise the roam backend, point a topic at a Roam MCP server
+registered with `ROAM_DRY_RUN=1` (writes become no-ops) or a disposable test
+graph — never a production graph. There is no offline structural fixture for it
+yet; `compile`/`lint --fix` on the roam backend require the server up with
+`ROAM_MUTATE=1`.
+
 ### When to update tests
 
 - **Added a new lint rule**: add a defect fixture in `generate-defect-fixtures.sh` and a negative test case in `test-structure.sh`.
@@ -93,7 +120,7 @@ claude-plugin/                  — source of truth, primary distribution target
   commands/*.md                 — command specs, including user commands, wiki router, and the deprecated thesis shim
   skills/wiki-manager/
     SKILL.md                    — skill manifest + fuzzy router
-    references/*.md             — reference docs (hub-resolution, archive, linting, audit, etc.)
+    references/*.md             — reference docs (hub-resolution, archive, linting, audit, roam-backend, etc.)
   .claude-plugin/
     plugin.json                 — plugin manifest
 plugins/llm-wiki/               — generated Codex packaging mirror (do NOT hand-edit)

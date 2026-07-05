@@ -1,7 +1,7 @@
 ---
 description: "Ask questions against the compiled wiki. Supports quick/standard/deep depth levels, --list for browsing, --include-archived for explicit archived reads, and --resume to reload context after a session break. Answers from wiki content only, with citations."
 argument-hint: "<question> [--quick] [--deep] [--raw] [--list] [--include-archived] [--resume] [--tag <tag>] [--category concepts|topics|references] [--with <wiki>...] [--wiki <name>] [--local]"
-allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit
+allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
 ---
 
 ## Your task
@@ -11,6 +11,7 @@ allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit
 2. If no config → read `$HOME/wiki/_index.md`. If it exists → HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` → `.wiki/` in CWD; `--wiki <name>` → `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` → use it; else → HUB.
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found (or no articles compiled). Run `/wiki init` and `/wiki:compile` first."
+5. **Resolve the backend.** Check the resolved wiki's `wikis.json` entry for `backend: "roam"` (else the global `wiki_backend` in `config.json`, else `files`). If **roam**, read `skills/wiki-manager/references/roam-backend.md` and answer from the Roam graph (`roam_datomic_query`/`roam_fetch_page_by_title`/`roam_search_by_text`/`roam_search_for_tag`) instead of reading `wiki/` files and `_index.md` hops. `raw/` reads in deep mode stay on disk. Citations are page titles/`[[links]]`. The default **files** backend behaves exactly as below.
 
 Answer the question in $ARGUMENTS using ONLY the knowledge in the wiki. Follow the Q&A protocol below.
 
@@ -55,6 +56,8 @@ quiet by default:
   `archived`.
 
 ### Index Freshness Check
+
+(**Roam backend:** skip this section — there is no `wiki/_index.md`. Datalog/backlinks are always current. Map the depth levels below to graph queries per `references/roam-backend.md`: Quick ≈ search + attribute pull, Standard ≈ fetch matched pages, Deep ≈ fetch + follow `[[links]]` + backlinks + grep `raw/` on disk. In capture mode, filter by `topic:: <name>` only when the user names a topic; otherwise search the whole graph.)
 
 Before using any `_index.md`, verify it's current: count `.md` files in the directory (excluding `_index.md`) and compare against rows in the index table. If counts differ, rebuild the index inline from file frontmatter before proceeding. See `references/indexing.md` Derived Index Protocol.
 

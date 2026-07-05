@@ -1,7 +1,7 @@
 ---
 description: "Truth-seeking umbrella audit for llm-wiki. Combines active wiki maintenance, output drift checks, provenance review, and fresh research when trust is in doubt."
 argument-hint: "scan [--artifact <path>] [--project <slug>] [--wiki-only] [--outputs-only] [--quick] [--fresh] [--include-archived] | report [--wiki <name>] [--local]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), WebFetch, WebSearch, Agent
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:*), Bash(mkdir:*), WebFetch, WebSearch, Agent, mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
 ---
 
 ## Your task
@@ -11,6 +11,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(wc:*), Bash(date:
 2. If no config -> read `$HOME/wiki/_index.md`. If it exists -> HUB = `$HOME/wiki`. If nothing found, ask the user where to create the wiki.
 3. **Wiki location** (first match): `--local` -> `.wiki/` in CWD; `--wiki <name>` -> `HUB/wikis.json` lookup with portable path resolution (`<HUB>`, `~`, absolute, or HUB-relative); if the registry path is stale, fall back to `HUB/topics/<name>`; CWD has `.wiki/` -> use it; else -> HUB.
 4. Read `<wiki>/_index.md` to verify. If missing -> stop with "No wiki found. Run `/wiki init` first."
+5. **Resolve the backend.** Check the resolved wiki's `wikis.json` entry for `backend: "roam"` (else the global `wiki_backend` in `config.json`, else `files`). If **roam**, read `skills/wiki-manager/references/roam-backend.md` § Other commands: the wiki-content pass reads articles from the Roam graph (and reuses librarian's roam-aware scan); the output-drift and session-provenance passes stay on disk; source-chain resolution crosses the boundary by resolving article `raw-source::`/`Sources` paths against `raw/` on disk. The default **files** backend behaves exactly as below.
 
 Read the audit reference at `skills/wiki-manager/references/audit.md`. If you need a fresh wiki-only pass, also read `commands/librarian.md` and reuse its scan protocol rather than inventing a parallel one.
 

@@ -1,0 +1,27 @@
+{
+  "extraKnownMarketplaces": {
+    "llm-wiki": {
+      "source": {
+        "source": "github",
+        "repo": "happytk/llm-wiki-rr"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "wiki@llm-wiki": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/wiki-workspace.sh\"",
+            "timeout": 5,
+            "statusMessage": "Configuring llm-wiki workspace (roam-archive backend)"
+          }
+        ]
+      }
+    ]
+  }
+}

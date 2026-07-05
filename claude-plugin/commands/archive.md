@@ -1,7 +1,7 @@
 ---
 description: "Archive or restore whole topic wikis so old interests stay preserved but out of default context. Archived topics move under HUB/topics/.archive and are hidden from normal semantic and maintenance workflows."
 argument-hint: "list [--archived] | topic <slug> [--reason \"why\"] | restore <slug> | peek <query> [--wiki <name>] [--include-archived]"
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(mkdir:*), Bash(mv:*), Bash(date:*), Bash(python3:*)
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(ls:*), Bash(mkdir:*), Bash(mv:*), Bash(date:*), Bash(python3:*), mcp__roam-direct, mcp__roam, mcp__roam-wiki, mcp__roam-archive
 ---
 
 ## Your task
@@ -31,6 +31,17 @@ Archive is a hub-level operation. Resolve **HUB** with the standard protocol:
 Do not archive project-local `.wiki/` directories in v1. Project archive remains
 `/wiki:project archive`; inventory and dataset archive remain `status:
 archived`.
+
+**Roam-backend topics:** when a topic's `wikis.json` entry has `backend: "roam"`
+(see `references/roam-backend.md`), the compiled `wiki/` layer lives in a Roam
+graph, not on disk. Archiving still moves the on-disk topic directory (`raw/`,
+indexes, logs, operational layers) under `topics/.archive/<slug>` and flips
+`status: "archived"` — but the **Roam graph is not moved or deleted**; it is
+simply excluded from default workflows by the `archived` status. Preserve the
+`backend` and `roam_graph` fields through archive and restore. For `peek` against
+a roam-backend topic, read the on-disk `raw/_index.md` and, if cheap, a
+titles-only `roam_datomic_query` (page titles only — never article bodies) unless
+`--include-archived`.
 
 ### Parse $ARGUMENTS
 
