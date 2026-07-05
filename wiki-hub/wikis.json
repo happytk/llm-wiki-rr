@@ -1,0 +1,17 @@
+{
+  "default": "<HUB>",
+  "backend": "roam",
+  "roam_server": "roam-archive",
+  "wikis": {
+    "hub": { "path": "<HUB>", "description": "Global knowledge base hub" },
+    "test": {
+      "path": "topics/test",
+      "description": "Test topic — Roam-backed sub-wiki",
+      "status": "active",
+      "backend": "roam",
+      "roam_server": "roam-archive",
+      "roam_page": "wiki/test"
+    }
+  },
+  "local_wikis": []
+}
