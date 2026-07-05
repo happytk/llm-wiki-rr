@@ -13,7 +13,7 @@ allowed-tools: Read, Glob, Grep, Bash(ls:*), Edit, mcp__roam-direct, mcp__roam, 
 4. Read `<wiki>/_index.md` to verify. If missing → stop with "No wiki found (or no articles compiled). Run `/wiki init` and `/wiki:compile` first."
 5. **Resolve the backend.** Check the resolved wiki's `wikis.json` entry for `backend: "roam"` (else the global `wiki_backend` in `config.json`, else `files`). If **roam**, read `skills/wiki-manager/references/roam-backend.md` and answer from the Roam graph (`roam_datomic_query`/`roam_fetch_page_by_title`/`roam_search_by_text`/`roam_search_for_tag`) instead of reading `wiki/` files and `_index.md` hops. `raw/` reads in deep mode stay on disk. Citations are page titles/`[[links]]`. The default **files** backend behaves exactly as below.
 
-Answer the question in $ARGUMENTS using ONLY the knowledge in the wiki. Follow the Q&A protocol below.
+Answer the question in $ARGUMENTS using ONLY the knowledge in the wiki. Follow the Q&A protocol below. If `content_language` is set in config (e.g. `ko`), write the answer prose in that language, keeping technical terms, proper nouns, code, citations, and page titles canonical (see `references/compilation.md` § Content Language).
 
 Inventory awareness: for factual questions, inventory is not evidence. Cite
 compiled wiki articles and raw sources, not operational inventory records. For

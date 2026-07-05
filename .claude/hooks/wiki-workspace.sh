@@ -36,7 +36,8 @@ cat > "$CFG_DIR/config.json" <<EOF
   "raw_roam_server": "wiki-s",
   "raw_mode": "namespace",
   "raw_namespace": "RAW/",
-  "meta_namespace": "META/"
+  "meta_namespace": "META/",
+  "content_language": "ko"
 }
 EOF
 

@@ -180,6 +180,7 @@ individual raw sources or compiled articles in v1.
 ### Compilation
 See [references/compilation.md](references/compilation.md).
 Flow: Survey uncompiled sources → plan articles → classify (concept/topic/reference) → write/update articles with cross-references → update all indexes.
+Honor `content_language` (config) when set — write synthesized prose (article body, summaries, answers) in that language, keeping technical terms, proper nouns, code, schema values, and dates canonical. See `references/compilation.md` § Content Language.
 
 ### Query
 Flow: Read `_index.md` → identify relevant articles by summary/tag → read articles → follow See Also links → Grep for additional matches → synthesize answer with citations → note gaps → peek active sibling wikis. Supports `--resume` to reload context after a session break — reads session files, recent log entries, wiki stats, and last-updated articles to produce a "where you left off" briefing. Deep queries may peek archived sibling indexes in a separate Archived Matches section; full archived reads require explicit user intent.

@@ -14,6 +14,35 @@ is archived, ask the user to restore it or explicitly include archived content.
 Compiling an archived target must keep all writes inside that archived topic and
 must not use archived sources to update active articles.
 
+## Content Language
+
+By default, synthesized content is written in the source/interface language. To
+compile into a specific language, set **`content_language`** in
+`~/.config/llm-wiki/config.json` (or a `wikis.json` topic entry) — e.g.
+`"content_language": "ko"`. When set, write all **synthesized prose** in that
+language: article abstract/body, section text, `summary::`/`summary:`, See-Also
+descriptions, and query answers. Ingest summaries follow the same setting.
+
+Keep the following in their **canonical/original form regardless** — do not
+translate them:
+
+- **Technical terms, proper nouns, product/library/protocol names, and code** —
+  keep as-is (e.g. Proof of Work, Transformer, `roam_replace_page`). Gloss in the
+  target language on first use if helpful, but don't invent translations.
+- **Schema values** — attribute/frontmatter keys and their enums
+  (`category::`, `confidence:: high`, `volatility:: warm`), namespace prefixes
+  (`RAW/`, `META/`, `Output/`), and tags used as identifiers.
+- **Dates** — Roam ordinal format stays English (`July 5th, 2026`); the daily
+  note title is computed by the server.
+- **Quoted source text** — quote verbatim; translate only in an explicit gloss.
+
+Article **titles**: prefer the most recognizable canonical form — keep an
+established technical/proper name as-is, use the target language for descriptive
+topic titles. Add the other-language name to `aliases::` so both resolve.
+
+This is a writing-style setting only; it never changes the schema, file layout,
+link format, or lint rules.
+
 ## Incremental vs Full
 
 - **Incremental** (default): Only process sources ingested since the last compilation date (from master `_index.md`). Compare source `ingested` dates against `Last compiled` in master index.
