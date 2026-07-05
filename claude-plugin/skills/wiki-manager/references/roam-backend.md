@@ -119,7 +119,7 @@ Triggered explicitly (`/wiki:ingest`, "put today's sources into raw", "이거 RA
 2. **Write one page** with `roam_replace_page({ title: "RAW/<Source Title>", children:[…] })` in a single transaction:
    - attributes: `type:: source`, `source-url:: <url>` **or** `source:: <where it came from>`, `ingested:: [[<today ordinal>]]`, `summary::`, `tags::`, and optional `topic::`.
    - the extracted content as an outliner subtree (one idea per block), so the page is self-contained. For binaries/PDFs, `roam_upload_file` the original and add `file:: <url>`.
-3. **Link it back to the daily note (non-destructive).** Add a child link under the originating daily-note block — or a fresh block on today's daily note — `Source: [[RAW/<Source Title>]]`, and stamp the RAW page with `captured:: [[<today ordinal>]]`. Leave the user's original block intact; the daily note becomes a dated index whose backlinks show the day on the RAW page. Do not delete what the user wrote.
+3. **Link it back to the daily note (non-destructive).** Add a child link under the originating daily-note block — or a fresh block on today's daily note — `Source: [[RAW/<Source Title>]] #[[wiki-log]] — <one-line>`. Leave the user's original block intact; the daily note becomes the dated index/log, and the RAW page's backlinks show that day. No separate `captured::` stamp is needed in this mode — the RAW page already carries `ingested:: [[today]]` (step 2) and the daily-note link provides the date backlink; `captured::` is only for capture mode, where there is no `ingested::` (see Roam-native capture mode). Do not delete what the user wrote.
 
 Because it is one graph, the daily note ↔ RAW ↔ article links are all **real** `[[links]]` with automatic backlinks — no text-only provenance anywhere in this mode.
 
@@ -157,21 +157,30 @@ All in-graph, no disk crossing:
 - **Link integrity (C4):** `[[RAW/…]]` targets that don't exist as pages → broken source links.
 - C2/C11/C14/C15 and `--fix` behave exactly as the roam backend section below (`roam_apply_page_ops` for one-field fixes). C1/C3 remain N/A.
 
-### Operational state (log, index, reports) → `META/` pages, never disk
+### Operational state (log, index, reports) → daily note + `META/`, never disk
 
-**Single-graph mode writes nothing durable to disk.** The hub is treated as ephemeral (in the web/container setup it is a scratch dir that disappears between sessions). Every operational artifact that other backends keep on disk lives in Roam instead, under a **`META/` namespace** (prefix from `meta_namespace`, default `META/`) — the operational counterpart of the `RAW/` content namespace. Like `RAW/…`, `META/…` pages are **not** articles (they carry no `category::`, so article queries already skip them) and are excluded from query answers.
+**Single-graph mode writes nothing durable to disk.** The hub is treated as ephemeral (in the web/container setup it is a scratch dir that disappears between sessions). Every operational artifact that other backends keep on disk lives in Roam instead.
 
-| Disk artifact (other backends) | Single-graph replacement | How |
+**The daily note *is* the activity log.** Roam's daily note is already a date-organized log — the native replacement for `log.md`. Do **not** keep a second date-organized `META/Log` page that duplicates it. Each mutating operation appends one block to **today's daily note** (`roam_add_to_daily_note`, omit the date), tagged `#[[wiki-log]]` so the whole history is one Datalog/backlink query away:
+
+- ingest → `Source: [[RAW/<Title>]] #[[wiki-log]] — <one-line>`
+- compile → `Wiki: [[<Article>]] #[[wiki-log]] — <one-line>`
+- lint --fix / librarian fix / output → `<operation> #[[wiki-log]] — <what changed>`
+
+That single block is both the human-facing index entry and the log record — one write, no duplication.
+
+**`META/` holds only what a date log cannot: single-value state and reports** (prefix from `meta_namespace`, default `META/`). Like `RAW/…`, `META/…` pages are **not** articles (no `category::`) and are excluded from query answers.
+
+| State that needs one durable home | Page | How |
 |---|---|---|
-| `log.md` activity log | **`[[META/Log]]`** page | append one block per operation under a `[[<ordinal date>]]` child block: `<operation> — <description>`. Append-only; never rewrite. Also add the human-facing `Wiki: [[Article]]` / `Source: [[RAW/…]]` links to **today's daily note** (`roam_add_to_daily_note`, omit the date) so the daily note stays the chronological index. |
-| master `_index.md` stats / Recent Changes / Last lint | **`[[META/Index]]`** page | attributes updated in place via `roam_apply_page_ops`: `sources:: N`, `articles:: N`, `last-compiled:: [[date]]`, `last-lint:: [[date]]`, plus a `Recent Changes` parent with recent-operation child blocks. Counts are **authoritative from Datalog** (`RAW/…` page count, article `category::` count); `META/Index` is a convenience stamp, so a stale count is a refresh, never a lint failure. |
-| `.librarian/REPORT.md`, `.audit/REPORT.md` | **`[[META/Librarian <ordinal>]]`**, **`[[META/Audit <ordinal>]]`** pages | write the report as a block tree; link it from `META/Index` and today's daily note. |
-| `output/<artifact>.md` | **`[[Output/<name>]]`** page (or deliver to the user directly) | `output` synthesizes into an `Output/…` page in the same graph; cite Roam articles by `[[title]]`. Do not depend on the ephemeral hub for the deliverable. |
+| current stats + last-run stamps | **`[[META/Index]]`** | attributes updated in place via `roam_apply_page_ops`: `last-compiled:: [[date]]`, `last-lint:: [[date]]`, and optional `sources:: N` / `articles:: N` **stamps**. Counts are **authoritative from Datalog** (`RAW/…` page count, article `category::` count); `META/Index` is a convenience cache, so a stale count is a refresh, never a lint failure. No "Recent Changes" list here — that is the daily note's job. |
+| librarian / audit reports | **`[[META/Librarian <ordinal>]]`**, **`[[META/Audit <ordinal>]]`** | write the report as a block tree; link it from today's daily note (`#[[wiki-log]]`). |
+| generated outputs | **`[[Output/<name>]]`** (or deliver to the user directly) | `output` synthesizes into an `Output/…` page; cite Roam articles by `[[title]]`. Do not depend on the ephemeral hub for the deliverable. |
 
 Rules:
 
 - **Never create the hub files** (`log.md`, `_index.md`, `wikis.json`, `raw/`, `.librarian/`, `.audit/`, `output/`) in single-graph mode. If the hub scratch dir has none, that is expected — the graph is the durable store. The Structural Guardian's disk checks (hub integrity, index freshness, orphan detection) are **N/A**; run their Roam equivalents (does `META/Index` exist, do its counts match Datalog) or skip with an info line. Do not "repair" by writing files to the ephemeral hub.
-- **`META/Log` append** is the log step for every mutating command (ingest, compile, lint --fix, librarian fix, output). Use `roam_create_block` with `parent_uid` of the date block (or create the date block first).
+- **The log step for every mutating command is the daily-note `#[[wiki-log]]` block** (ingest, compile, lint --fix, librarian fix, output) — not a separate log page. Query the log with `roam_search_for_tag "wiki-log"` or a Datalog scan of `#[[wiki-log]]` blocks by date.
 - **Sessions/feedback** (`HUB/.sessions/…`) are a separate harness-hook subsystem that also lives on the ephemeral hub; in single-graph mode treat them as best-effort/ephemeral. Promoting a session or feedback note into the wiki writes a `RAW/…` page (then compile), not a disk file.
 
 Everything else (attribute mapping, batch writes, `roam_apply_page_ops` rewrite rules, no `((uid))` cross-refs, daily-note-collision rule) is identical to the rest of this file.
@@ -220,7 +229,7 @@ Page: "Proof of Work"
 | `sources` *(single-graph)* | `source:: [[RAW/<title>]]` attribute + `[[RAW/<title>]]` blocks under `Sources` | single-graph mode — real in-graph link, not a path; backlinks give coverage |
 | *(no durable raw)* | `source-url:: <url>` | capture mode — provenance when there is no raw file (see Roam-native capture mode) |
 | *(optional grouping)* | `topic:: <name>` | optional; groups pages within a single graph (see capture mode) |
-| *(capture stamp)* | `captured:: [[<ordinal date>]]` | the daily note the page was captured on |
+| *(capture stamp)* | `captured:: [[<ordinal date>]]` | **capture mode only** — the daily note a raw-free page was captured on. In single-graph mode use `ingested::` on the RAW page instead (no `captured::`). |
 
 **Dates use ordinal format** (`June 24th, 2026`, never `June 24, 2026`) — Roam treats the non-ordinal form as a different page. Never give an article a title that collides with a daily-note date.
 
@@ -342,7 +351,7 @@ Structural checks shift from filesystem walks to graph queries; cross-boundary c
 2. List `raw/` on disk; the uncompiled set = disk sources − compiled set (also recompile when a source's `ingested:` is newer than the article's `updated::`).
 3. Read uncompiled raw sources from disk, synthesize, write/rewrite article pages with `roam_replace_page`.
 4. Update the on-disk master `_index.md` **stats** (source/article counts) by deriving article counts from a Datalog count; there is no `wiki/_index.md` to rebuild. **(Single-graph mode: update `[[META/Index]]` in Roam instead — the hub is ephemeral, nothing is written to disk. See § Single-graph mode → Operational state.)**
-5. Log to `log.md` on disk as usual. **(Single-graph mode: append to `[[META/Log]]` + today's daily note instead.)**
+5. Log to `log.md` on disk as usual. **(Single-graph mode: append one `#[[wiki-log]]` block to today's daily note instead — the daily note is the log; no disk, no separate log page.)**
 
 ---
 
