@@ -35,8 +35,9 @@ cat > "$CFG_DIR/config.json" <<EOF
   "roam_server": "wiki-s",
   "raw_roam_server": "wiki-s",
   "raw_mode": "namespace",
-  "raw_namespace": "RAW/"
+  "raw_namespace": "RAW/",
+  "meta_namespace": "META/"
 }
 EOF
 
-echo "llm-wiki: single-graph roam mode -> graph=wiki-s, raw=RAW/* pages, wiki=unprefixed pages (DailyNote -> RAW/* -> article; content in Roam, not git)"
+echo "llm-wiki: single-graph roam mode -> graph=wiki-s, raw=RAW/* pages, wiki=unprefixed pages, log/index/reports=META/* pages (DailyNote -> RAW/* -> article; everything in Roam, nothing on the ephemeral hub)"
