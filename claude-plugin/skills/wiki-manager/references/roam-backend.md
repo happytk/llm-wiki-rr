@@ -83,6 +83,9 @@ Page: "Proof of Work"
 | `aliases` | `aliases:: a, b` | comma-separated |
 | `compiled-from` | `compiled-from:: sources\|conversation\|mixed` | |
 | `sources` | one block per source under a `Sources` parent **and** a `raw-source::` attribute list | see source tracking below |
+| *(no durable raw)* | `source-url:: <url>` | capture mode — provenance when there is no raw file (see Roam-native capture mode) |
+| *(optional grouping)* | `topic:: <name>` | optional; groups pages within a single graph (see capture mode) |
+| *(capture stamp)* | `captured:: [[<ordinal date>]]` | the daily note the page was captured on |
 
 **Dates use ordinal format** (`June 24th, 2026`, never `June 24, 2026`) — Roam treats the non-ordinal form as a different page. Never give an article a title that collides with a daily-note date.
 
@@ -100,6 +103,45 @@ Page: "Proof of Work"
 - as a `raw-source::` attribute (one value per source, machine-queryable for incremental compile and lint coverage).
 
 Never store raw content in Roam — only the path reference. Resolving these paths back to files uses the same Source Reference Resolution protocol as the files backend (`wiki-structure.md`), rooted at HUB.
+
+---
+
+## Roam-native capture mode (raw-free)
+
+A lighter variant of the roam backend for **capture-first, no-durable-local** use — e.g. a phone-only or globally-installed skill where you "just put this into my wiki" and everything lives in one Roam graph. It is the roam backend with three relaxations. Use it when the wiki has **no durable `raw/` layer** (raw is ephemeral or absent).
+
+**Trigger is always explicit.** Only capture when the user explicitly asks ("put this in the wiki", "이거 위키에 넣어줘", `/wiki:ingest`, `/wiki:compile`). Never auto-detect and never capture conversation content the user did not ask you to.
+
+### 1. Raw-optional inputs
+
+There is no durable `raw/` file to point at. Track provenance on the page instead:
+
+| Input | How to compile | Provenance attribute |
+|---|---|---|
+| **Conversation / context** ("capture this discussion") | synthesize the article directly from the conversation → page | `compiled-from:: conversation` |
+| **URL / attachment** (raw not kept) | fetch, extract, synthesize → page; discard the fetched source after | `compiled-from:: sources` + `source-url:: <url>` |
+
+Skip `raw-source::` and the `Sources`-of-file-paths block when there is no raw file. `source-url::` (or `compiled-from:: conversation`) is the honest provenance. Lint's raw-coverage/provenance checks (C4b/C6) do not apply when there is no `raw/` layer — treat them as satisfied by `source-url::`/`compiled-from::`.
+
+### 2. Topic-optional
+
+Do **not** require a topic. A captured page is just a page in the graph. When the user wants grouping, add a `topic:: <name>` attribute (and optionally `#[[Topic/<name>]]`). Query filters by `topic::` only when the user asks for a topic; otherwise search the whole graph. Never invent a topic the user did not name.
+
+### 3. Daily-note integration
+
+On every capture, use the connected server's daily-note tools (`roam_add_to_daily_note`; omit the date so the server computes today's ordinal title):
+
+- **(a) Capture log** — add one block to **today's daily note** linking the new page: `Wiki: [[Article Title]] — <one-line summary>`. This makes the daily note a chronological index and puts the day in the article's backlinks. It replaces the on-disk `log.md`.
+- **(b) Daily-note inbox** *(explicit trigger — "compile today's/my recent daily notes into the wiki")* — read the daily note(s) with `roam_fetch_page_by_title` (ordinal title) or `roam_find_pages_modified_today`, synthesize the blocks the user jotted there into one or more articles, then link them back per (a). Do not consume arbitrary daily-note content unless asked.
+- **(c) Context stamp** — add `captured:: [[<today ordinal>]]` to each new page.
+
+### 4. Global install (closed-network / self-hosted Claude Code)
+
+For "skill available everywhere, no repo, no local hub":
+
+- Enable the plugin in **user settings** (`~/.claude/settings.json` `enabledPlugins`) so it activates in any directory/session (this is for a self-hosted CLI/desktop Claude Code; Claude Code on the web ignores user-scoped enablement and needs the repo's `.claude/settings.json` instead).
+- Register the Roam MCP server globally (`claude mcp add`), pointing at the capture graph.
+- Set a global default in `~/.config/llm-wiki/config.json`: `{ "wiki_backend": "roam", "roam_server": "<alias>" }`. No hub directory, no `raw/`, no topics required — conversation capture writes straight to the graph with `compiled-from:: conversation`.
 
 ---
 

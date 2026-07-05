@@ -78,6 +78,14 @@ wiki config selects which connected server/graph to use — the plugin does not
 hardcode one; commands list several common aliases in `allowed-tools`
 (`roam`, `roam-wiki`, `roam-archive`, `roam-direct`). Prefer a dedicated wiki
 graph over a large personal graph, since `compile` writes one page per article.
+`roam-backend.md` also defines a **raw-free capture mode** (explicit-trigger
+only): conversation (`compiled-from:: conversation`) or URL (`source-url::`) →
+a graph page, optional `topic::` grouping, and a daily-note capture log +
+`captured::` stamp — no durable `raw/` and no local hub content, so nothing wiki
+content-related is ever committed to git (skill code is; content lives in Roam).
+For a globally-installed self-hosted Claude Code, enable the plugin in user
+settings and set `wiki_backend`/`roam_server` in `~/.config/llm-wiki/config.json`.
+
 The structural tests and golden-wiki fixtures only cover the default `files`
 backend. To exercise the roam backend, point a topic at a Roam MCP server
 registered with `ROAM_DRY_RUN=1` (writes become no-ops) or a disposable test

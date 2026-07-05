@@ -57,7 +57,7 @@ quiet by default:
 
 ### Index Freshness Check
 
-(**Roam backend:** skip this section — there is no `wiki/_index.md`. Datalog/backlinks are always current. Map the depth levels below to graph queries per `references/roam-backend.md`: Quick ≈ search + attribute pull, Standard ≈ fetch matched pages, Deep ≈ fetch + follow `[[links]]` + backlinks + grep `raw/` on disk.)
+(**Roam backend:** skip this section — there is no `wiki/_index.md`. Datalog/backlinks are always current. Map the depth levels below to graph queries per `references/roam-backend.md`: Quick ≈ search + attribute pull, Standard ≈ fetch matched pages, Deep ≈ fetch + follow `[[links]]` + backlinks + grep `raw/` on disk. In capture mode, filter by `topic:: <name>` only when the user names a topic; otherwise search the whole graph.)
 
 Before using any `_index.md`, verify it's current: count `.md` files in the directory (excluding `_index.md`) and compare against rows in the index table. If counts differ, rebuild the index inline from file frontmatter before proceeding. See `references/indexing.md` Derived Index Protocol.
 
