@@ -29,11 +29,12 @@ Resolve the backend immediately after resolving the wiki (the HUB + wiki-locatio
      "path": "topics/bitcoin",
      "backend": "roam",
      "roam_graph": "bitcoin",
-     "roam_server": "roam-wiki"
+     "roam_server": "wiki",
+     "raw_roam_server": "wiki-raw"
    }
    ```
-   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name, for reference/logging) and `roam_server` (**the connected MCP server alias to call** — e.g. `roam`, `roam-wiki`, `roam-archive`, or `roam-direct`; there is no fixed default, it is whatever the user registered).
-2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_server` = config `roam_server`. Do not assume a specific alias.
+   If `backend: "roam"` is present → **roam backend**. Read `roam_graph` (the Roam graph name, for reference/logging), `roam_server` (**the connected MCP alias for the compiled wiki graph** — e.g. `wiki`, `roam-wiki`, `roam-archive`; whatever the user registered), and the optional `raw_roam_server` (the alias for a **separate raw/source graph** — see Two-graph mode). If `raw_roam_server` is absent, raw is on disk or raw-free.
+2. **Global default.** Else if `~/.config/llm-wiki/config.json` has `"wiki_backend": "roam"` → roam backend. Use `roam_server` = config `roam_server` (and `raw_roam_server` if present). Do not assume a specific alias.
 3. **Otherwise → `files` backend** (default). Proceed exactly as the file-based references describe.
 
 **`roam_server` selects the graph.** Each Roam MCP server points at exactly one graph (its `ROAM_GRAPH`), so the alias in `roam_server` *is* the graph selector. Set it per topic to route each topic wiki to whichever graph you want — a dedicated wiki graph, a per-topic graph, or (if you accept co-mingling) an existing graph. The agent calls tools as `mcp__<roam_server>__roam_*` (e.g. `mcp__roam-wiki__roam_replace_page`). Writes require that server to be registered with `ROAM_MUTATE=1`.
@@ -41,6 +42,26 @@ Resolve the backend immediately after resolving the wiki (the HUB + wiki-locatio
 > **Prefer a dedicated wiki graph.** `compile` creates one page per article. Pointing `roam_server` at a large personal/daily-notes graph mixes wiki pages into it. Register a separate graph (or MCP alias) for the wiki layer unless you deliberately want them together.
 
 **Preflight (roam backend only).** Before the first write, confirm the `roam_server` MCP tools (`mcp__<roam_server>__*`) are actually connected. If they are not, stop and tell the user: the topic is configured for the roam backend but its Roam MCP server (`<roam_server>`) is not connected. Do **not** silently fall back to writing files — that would split the wiki across two backends. (Note: `allowed-tools` on the commands lists several common aliases; if your alias differs, add `mcp__<your-alias>` there or approve the tool when prompted.)
+
+---
+
+## Two-graph mode (separate raw + wiki graphs)
+
+When `raw_roam_server` is set, the **raw/source layer lives in its own Roam graph** and the compiled wiki lives in another — e.g. `raw_roam_server: "wiki-raw"` and `roam_server: "wiki"`. Nothing is on disk or in git. This is the durable, dated source archive that `compile` reads from.
+
+Flow:
+- **`ingest`** writes a **source page to the raw graph** (`mcp__<raw_roam_server>__*`). One page per source, titled by the source title, with attributes:
+  - `type:: source`, `source-url:: <url>` (or `source:: <where it came from>`), `ingested:: [[<today ordinal>]]`, `summary::`, `tags::`
+  - the extracted content as child blocks (outliner structure), so the source is self-contained; for a binary/PDF, `roam_upload_file` the original and add `file:: <url>`.
+  - Also add a `Source: [[Title]]` link block to **that graph's** today daily note → the raw graph becomes a date-organized inbox.
+- **`compile`** reads sources from the **raw graph**, synthesizes, and writes **article pages to the wiki graph** (`mcp__<roam_server>__*`). After compiling a source, stamp it **in the raw graph** with `compiled:: [[<today>]]` and `compiled-into:: <Article Title>` so it is not recompiled.
+  - **Incremental / by date:** find uncompiled sources with `roam_datomic_query` on the raw graph — `type:: source` pages lacking a `compiled::` value, or filtered by an `ingested:: [[date]]` range (or by reading a specific day's daily note). This is how "compile the sources I added this week" works.
+  - **Manual entries:** the user may add source pages/blocks to the raw graph directly (in the Roam app). Treat any page the user points at — or any `type:: source` page without `compiled::` — as ingestable, even if it lacks full metadata; infer title/summary from its content.
+
+**Cross-graph provenance (important constraint).** `[[links]]` only resolve **within one graph**. An article in the `wiki` graph therefore cannot live-link `[[source]]` in the `wiki-raw` graph. Record provenance on the article as **text attributes**, not cross-graph links:
+- `source-title:: <raw page title>` and `source-url:: <url>` (and optionally the raw page's deep-link URL). Within each graph, real `[[links]]` still work (article↔article in `wiki`; source↔source in `wiki-raw`). `raw-source::` (disk path) is not used in this mode.
+
+Everything else about the wiki graph (attribute mapping, `[[title]]` article links, batch `roam_replace_page` writes, daily-note capture log, Datalog reads/lint) is exactly as in the single-graph roam backend — it just points at `roam_server` while ingest points at `raw_roam_server`.
 
 ---
 
