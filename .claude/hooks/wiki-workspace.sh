@@ -15,9 +15,13 @@
 # Roam. So the hub points at an EPHEMERAL scratch dir (outside the repo); there is
 # no durable `raw/` and nothing wiki-content-related ever lands in git.
 #
-# The `wiki-s` MCP connector is provided by the user (register a Roam MCP server
-# whose ROAM_GRAPH is the test graph, with ROAM_MUTATE=1 for writes). If the alias
-# differs, change roam_server/raw_roam_server below to match.
+# The `wiki-s` MCP connector points at the hosted Roam MCP server for the wiki-s
+# graph. It is registered below with STATIC API-KEY auth instead of OAuth: OAuth
+# connector tokens expire on every container/session resume, whereas an API key
+# supplied via an environment secret survives resumes. The key is read from the
+# $ROAM_WIKI_S_TOKEN environment variable (set it as a secret in the web
+# environment settings) and is NEVER written into this repo. If the alias or
+# endpoint differ, change roam_server/raw_roam_server and ROAM_WIKI_S_URL below.
 #
 # Scope: only sessions launched on this repo run this hook. It writes just the
 # llm-wiki config. Delete this hook (and the .claude/settings.json SessionStart
@@ -40,5 +44,23 @@ cat > "$CFG_DIR/config.json" <<EOF
   "content_language": "ko"
 }
 EOF
+
+# --- Register the wiki-s Roam MCP connector with static API-key auth ---
+# Re-runs every session (the container is ephemeral, so nothing persists between
+# resumes except the env secret). The token is read from the environment and
+# passed as a Bearer header; it is never stored in the repo or in config.json.
+ROAM_WIKI_S_URL="https://rr0.fly.dev/mcp?graph=wiki-s"
+if [ -n "${ROAM_WIKI_S_TOKEN:-}" ]; then
+  # Idempotent: drop any stale/OAuth registration of the same alias, then re-add.
+  claude mcp remove wiki-s -s local >/dev/null 2>&1 || true
+  if claude mcp add --transport http -s local wiki-s "$ROAM_WIKI_S_URL" \
+       --header "Authorization: Bearer ${ROAM_WIKI_S_TOKEN}" >/dev/null 2>&1; then
+    echo "llm-wiki: registered wiki-s MCP (API-key auth) -> $ROAM_WIKI_S_URL"
+  else
+    echo "llm-wiki: WARNING could not register wiki-s MCP connector (check 'claude mcp add')"
+  fi
+else
+  echo "llm-wiki: WARNING ROAM_WIKI_S_TOKEN not set -> wiki-s MCP not registered. Add it as an environment secret in the web environment settings."
+fi
 
 echo "llm-wiki: single-graph roam mode -> graph=wiki-s, raw=RAW/* pages, wiki=unprefixed pages, log/index/reports=META/* pages (DailyNote -> RAW/* -> article; everything in Roam, nothing on the ephemeral hub)"
