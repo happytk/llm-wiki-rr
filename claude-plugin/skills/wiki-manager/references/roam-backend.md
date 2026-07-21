@@ -95,6 +95,18 @@ DailyNote (URLs / docs / emails / pasted text)
 
 Active when `raw_roam_server == roam_server` (or `raw_mode: "namespace"`). This is the mode for "I have one graph and one MCP connector and I want the whole source→raw→wiki pipeline inside it."
 
+### The daily note is the canonical ingest inbox and evidence basis
+
+**Contract.** In single-graph mode the **daily note is the one place sources gather before they enter the wiki**, and it is the **evidence basis every ingest is grounded in**. Three rules, non-negotiable in this mode:
+
+1. **Capture always lands in *today's* daily note.** Whenever a source is captured — a URL, a file, pasted text, an email, "put this in my wiki" — it is deposited into the **current day's** daily note first. The daily note, not an ad-hoc `RAW/…` page, is the canonical inbox; a source becomes a `RAW/…` page *from* its daily-note entry, and a link back to that entry stays on the day. So "capture this" ⇒ it appears on today's daily note, every time. There is no capture path that bypasses the daily note.
+
+2. **The daily note also holds your own thoughts.** Besides captured sources, the user types **their own thought blocks** straight into the daily note — commentary, framing, questions, tentative conclusions. These are **first-class inputs, not noise**: ingest treats a day's user-authored blocks as evidence on equal footing with that day's captured sources. Do not discard, summarize away, or ignore them — they are part of what the wiki is built from.
+
+3. **Ingest is always grounded in a day's daily note.** Building or updating the wiki works **from the sources on a daily note** — a given day's (default: today's) daily-note blocks: its captured-source links (→ `RAW/…` pages) **and** the user's own thought blocks. That daily note is the evidentiary basis; the article is synthesized from it and cites it. Ingest does **not** free-scan the graph divorced from a daily note — it reads the day's daily note and grounds the wiki in exactly those sources.
+
+In short: **DailyNote (captured sources + your thoughts) → `RAW/…` → wiki**, with the daily note as both the inbox and the ground truth for every ingest. The two subsections below (ingest, compile) are how this contract is executed; read them through it.
+
 **Why a namespace, not just any prefix-free page.** Do **not** treat "any page without the `RAW/` prefix" as an article — daily notes (dated pages), `#tag` pages, and attribute pages are all unprefixed too. Articles are identified **positively** by their attributes (`category::`, and the `updated::`/`verified::` stamps compile writes), exactly as everywhere else. The `RAW/` prefix marks the *raw* layer; it is not a definition of "article." Every query below filters on `RAW/` (in or out) explicitly, never on "no prefix."
 
 ### What counts as a source (daily-note inputs)
@@ -109,14 +121,17 @@ Sources split by **where the body lives**, which decides copy-vs-move (see step 
 | An `.pdf`/file upload or attachment | outside the graph | `roam_upload_file` the original, `file:: <url>`, **extract** text into blocks |
 | An email / pasted text / freeform / meeting notes typed into the daily note | **already in the graph** (on the daily note) | **move** the block(s) under the RAW page (`roam_move_block`); do **not** copy. `source:: email\|note` |
 | A block that already `[[links]]` a page | on that page | treat that page as the source (no new RAW page unless the user wants a copy) |
+| **The user's own thought / idea block** (not fetched, not pasted from elsewhere) | on the daily note | **stays on the daily note** — not archived to a `RAW/…` page. It is *evidence for synthesis*, folded into the article directly at compile time (see Compile step 1b). Do not move or delete it. |
 
 The user may also point at a specific block or page directly ("ingest this") — honor that regardless of where it sits.
+
+**Sources vs. thoughts.** Two kinds of block gather on a daily note, and they are handled differently. A **captured source** (URL, file, pasted external text) is archived into a `RAW/…` page — durable, immutable provenance. The **user's own thought block** is *not* archived to RAW; it is grounding the user brought, and it feeds the article's synthesis in place (compile reads it off the daily note). Both are first-class evidence for that day's ingest; only the former becomes a `RAW/…` page.
 
 **Copy vs move — the key rule.** Never duplicate a body that is already in the graph. If the source content was pasted/typed into the daily note (meeting notes, an email, freeform text), that text is the raw source and it already exists once — **move** it into the RAW page rather than copying it (which would leave two copies). Only content that lives *outside* the graph (a URL's page, an uploaded file's text) is *extracted into* RAW.
 
 ### Ingest: DailyNote → `RAW/<title>` page
 
-Triggered explicitly (`/wiki:ingest`, "put today's sources into raw", "이거 RAW로 넣어줘"). For each source block:
+Triggered explicitly (`/wiki:ingest`, "put today's sources into raw", "이거 RAW로 넣어줘"). Per contract rule 1, the daily note is where every capture lands first: if the user hands a source straight to ingest (a URL/file not yet on the note), drop a block for it onto **today's** daily note before (or as) you archive it, so the day's note stays the complete record of what was captured. For each source block on the note:
 
 1. **Resolve title.** Fetch the URL / read the attachment / read the pasted text; derive a human title. Title the page `RAW/<Source Title>`. On collision with an existing `RAW/<Source Title>`, append ` (<ordinal date>)` or a `-2` counter — never overwrite an existing raw page (raw is immutable).
 2. **Create the RAW page and place the body — copy for external, move for in-graph:**
@@ -129,9 +144,13 @@ Because it is one graph, the daily note ↔ RAW ↔ article links are all **real
 
 ### Compile: `RAW/<title>` → `<Article Title>`
 
-Reads uncompiled `RAW/…` pages, synthesizes article pages (unprefixed), and stamps provenance — all in the same graph:
+Grounded in a **day's daily note** (per the contract above): reads that day's captured sources (`RAW/…` pages) **and** the user's own thought blocks on the note, synthesizes article pages (unprefixed), and stamps provenance — all in the same graph.
 
-1. **Find uncompiled raw pages** — `roam_datomic_query`: pages whose title starts with the namespace and that lack a `compiled::` value:
+1. **Anchor to the daily note (the basis).** Read the target day's daily note (`roam_fetch_page_by_title` with the ordinal title; default today). It is the evidentiary basis for this ingest. From it, gather **both**:
+   - **its captured-source links** — the `Source: [[RAW/<Title>]]` entries (→ the day's `RAW/…` pages), and
+   - **the user's own thought blocks** — the free blocks the user typed on the note that aren't source links or `[[META/Log]]` entries.
+
+   To resolve which `RAW/…` pages the day introduced (or to compile a range — "everything I added this week"), query the raw layer for pages lacking a `compiled::` value and cross-reference the daily note(s), rather than compiling a raw page that no daily note ever referenced:
    ```
    [:find (pull ?p [:node/title]) :where
      [?p :node/title ?t] [(clojure.string/starts-with? ?t "RAW/")]
@@ -139,10 +158,11 @@ Reads uncompiled `RAW/…` pages, synthesizes article pages (unprefixed), and st
           [(clojure.string/starts-with? ?s "compiled::")])]
    ```
    (Filter by `ingested:: [[date]]` range, or read a specific day's daily note, for "compile what I added this week/today.")
-2. **Synthesize** one or more article pages from the raw content. Write each as one nested `children` tree via `roam_replace_page({ title:"<Article Title>", … })` — one transaction per article. The article title is unprefixed and **must never** start with `RAW/` or collide with an ordinal date (daily-note collision).
+1b. **Fold in the user's thoughts as evidence.** Treat the day's user-authored thought blocks as first-class input alongside the RAW sources — the article's framing, emphasis, and conclusions may come from them, not only from the fetched sources. When an article draws on both, set `compiled-from:: mixed`; when it draws only on the user's notes (no captured source), set `compiled-from:: conversation`. The thought blocks stay on the daily note (they are not archived to RAW); record their contribution in the article's provenance, not by relocating them.
+2. **Synthesize** one or more article pages from the raw content **and the day's thought blocks**. Write each as one nested `children` tree via `roam_replace_page({ title:"<Article Title>", … })` — one transaction per article. The article title is unprefixed and **must never** start with `RAW/` or collide with an ordinal date (daily-note collision).
 3. **Provenance is a real link, not text.** Under a `Sources` parent block, list each source as `[[RAW/<Source Title>]]`, and add a `source:: [[RAW/<Source Title>]]` attribute (one value per source, Datalog-queryable). The RAW page's linked-references now show every article built from it — this is the coverage index. (`raw-source::` disk paths and cross-graph `source-title::` text are **not** used in this mode.)
 4. **Stamp the raw page** (not the article) so it is not recompiled: `roam_apply_page_ops` to add `compiled:: [[<today ordinal>]]` and `compiled-into:: [[<Article Title>]]` to the `RAW/…` page. Never rewrite the raw page's content — raw is immutable; only append these two provenance attributes.
-5. **Capture log** — add `Wiki: [[<Article Title>]] — <one-line summary>` to today's daily note (`roam_add_to_daily_note`, omit the date). Set `compiled-from:: sources`, plus `created::`/`updated::`/`verified:: [[<today>]]` on the article as usual.
+5. **Capture log** — add `Wiki: [[<Article Title>]] — <one-line summary>` to today's daily note (`roam_add_to_daily_note`, omit the date). Set `compiled-from::` per step 1b (`sources`, `mixed`, or `conversation`), plus `created::`/`updated::`/`verified:: [[<today>]]` on the article as usual.
 
 ### Reading / query (single-graph mode)
 
