@@ -55,7 +55,7 @@ The compiled `wiki/` layer has two backends. The **`raw/` evidence layer and all
 - **`files`** (default) — articles are markdown files under `wiki/` with derived `_index.md` caches. This is the behavior every other reference assumes.
 - **`roam`** — articles live as pages in a self-hosted Roam graph (local, or hosted e.g. on fly.dev), written/read through a connected Roam MCP server using its batch tools (`roam_replace_page`, `roam_apply_page_ops`, `roam_create_block` with `children`, `roam_datomic_query`). The `roam_server` alias selects the graph — each server points at one `ROAM_GRAPH`.
 
-Resolve the backend right after the wiki: a `wikis.json` topic entry's `backend: "roam"` (with `roam_server`, the connected MCP alias to call — e.g. `roam`, `roam-wiki`, `roam-direct`) wins; else the global `wiki_backend` in `config.json`; else `files`. When the backend is `roam`, read [references/roam-backend.md](references/roam-backend.md) — it defines the article↔page mapping, frontmatter→attribute conventions, source tracking across the raw↔wiki boundary, per-command behavior, and a **raw-free capture mode** (explicit-trigger only) for capture-first use: conversation (`compiled-from:: conversation`) or URL (`source-url::`) → a graph page, optional `topic::` grouping, and a daily-note capture log + `captured::` stamp. `ingest` and the other disk-only commands are unaffected.
+Resolve the backend right after the wiki: a `wikis.json` topic entry's `backend: "roam"` (with `roam_server`, the connected MCP alias to call — e.g. `roam`, `roam-wiki`, `roam-direct`, `wiki-s`) wins; else the global `wiki_backend` in `config.json`; else `files`. When the backend is `roam`, read [references/roam-backend.md](references/roam-backend.md) — it defines the article↔page mapping, frontmatter→attribute conventions, source tracking across the raw↔wiki boundary, per-command behavior, and **four raw-layer topologies**: single-layer (disk `raw/` → Roam wiki), **two-graph** (`raw_roam_server` ≠ `roam_server`), **single-graph** (`raw_roam_server` == `roam_server`, or `raw_mode: "namespace"` — raw and wiki share one graph, raw pages carry a `RAW/` title namespace, and the pipeline is `DailyNote → RAW/* → unprefixed article` with real in-graph `[[RAW/…]]` provenance links), and a **raw-free capture mode** (explicit-trigger only): conversation (`compiled-from:: conversation`) or URL (`source-url::`) → a graph page, optional `topic::` grouping, daily-note capture log + `captured::` stamp. `ingest` and other disk-only commands are unaffected except in two-graph/single-graph mode, where ingest writes source pages into Roam instead of disk.
 
 ## Wiki Location
 
@@ -180,6 +180,7 @@ individual raw sources or compiled articles in v1.
 ### Compilation
 See [references/compilation.md](references/compilation.md).
 Flow: Survey uncompiled sources → plan articles → classify (concept/topic/reference) → write/update articles with cross-references → update all indexes.
+Honor `content_language` (config) when set — write synthesized prose (article body, summaries, answers) in that language, keeping technical terms, proper nouns, code, schema values, and dates canonical. See `references/compilation.md` § Content Language.
 
 ### Query
 Flow: Read `_index.md` → identify relevant articles by summary/tag → read articles → follow See Also links → Grep for additional matches → synthesize answer with citations → note gaps → peek active sibling wikis. Supports `--resume` to reload context after a session break — reads session files, recent log entries, wiki stats, and last-updated articles to produce a "where you left off" briefing. Deep queries may peek archived sibling indexes in a separate Archived Matches section; full archived reads require explicit user intent.
@@ -255,6 +256,8 @@ See `references/research-infrastructure.md` § Agent Prompt Templates for exampl
 ## Activity Log
 
 Every wiki operation appends to `log.md` in the wiki root. Format: `## [YYYY-MM-DD] operation | Description`. See [references/wiki-structure.md](references/wiki-structure.md) for full format. Never edit or delete existing log entries — append only.
+
+**Roam single-graph mode:** the hub is ephemeral, so there is no `log.md` (or `_index.md`) on disk — the **daily note is the activity log** (append one block per operation tagged `[[META/Log]]`; collect the log from that page's backlinks — no content-log page), and single-value state (`last-compiled::`/`last-lint::`) lives on a `[[META/Index]]` page. See [references/roam-backend.md](references/roam-backend.md) § Single-graph mode → Operational state.
 
 ## Confidence Scoring
 
